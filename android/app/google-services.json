@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "597433345372",
+    "project_id": "parlouraccount-a38a7",
+    "storage_bucket": "parlouraccount-a38a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597433345372:android:2f9e226bb95dea20fc0d99",
+        "android_client_info": {
+          "package_name": "com.example.parlour_account"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA00-_pV1ShJHhzKt4HcWzNBxJIye_uAGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
