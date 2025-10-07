@@ -1,10 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // For kIsWeb check
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'package:mime/mime.dart'; // Package to check MIME type of the file
 
 class BillPaymentEntryPage extends StatefulWidget {
   const BillPaymentEntryPage({super.key});
@@ -17,18 +12,26 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
   final _formKey = GlobalKey<FormState>();
 
   // Controllers for the form fields
-  final TextEditingController _billAmountCashController = TextEditingController();
-  final TextEditingController _billAmountOnlineController = TextEditingController();
+  final TextEditingController _billAmountCashController =
+      TextEditingController();
+  final TextEditingController _billAmountOnlineController =
+      TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _dateController =
+      TextEditingController(); // Controller for date
 
   // DateTime object to hold the selected date
   DateTime? _selectedDate;
 
-  // Variables to hold the selected image file and its URL
-  File? _imageFile;
-  String? _imageUrl;
-
-  final ImagePicker _picker = ImagePicker(); // Image picker instance
+  @override
+  void dispose() {
+    // Dispose controllers to free up resources
+    _billAmountCashController.dispose();
+    _billAmountOnlineController.dispose();
+    _descriptionController.dispose();
+    _dateController.dispose();
+    super.dispose();
+  }
 
   // Function to handle form submission and store data in Firestore
   void _submitForm() async {
@@ -37,38 +40,20 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
         'billAmountCash': _billAmountCashController.text,
         'billAmountOnline': _billAmountOnlineController.text,
         'description': _descriptionController.text,
-        'date': _selectedDate?.toLocal().toString().split(' ')[0] ?? 'Not selected',
+        'date': _dateController.text, // Get date from controller
         'timestamp': Timestamp.now(),
       };
 
-      // If there's an image, upload it to Firebase Storage
-      if (_imageFile != null) {
-        try {
-          String fileName = DateTime.now().millisecondsSinceEpoch.toString(); // Unique file name
-          Reference storageReference = FirebaseStorage.instance.ref().child('bill_images/$fileName');
-          UploadTask uploadTask = storageReference.putFile(_imageFile!);
-
-          // Wait for the upload to complete
-          TaskSnapshot taskSnapshot = await uploadTask.whenComplete(() {});
-
-          // Get the image URL after upload is complete
-          String imageUrl = await taskSnapshot.ref.getDownloadURL();
-
-          // Add the image URL to the data model
-          data['imageUrl'] = imageUrl;
-        } catch (e) {
-          print('Error uploading image: $e');
-        }
-      }
-
       // Store the data in Firestore under the 'BillPaymentEntry' collection
       try {
-        await FirebaseFirestore.instance.collection('BillPaymentEntry').add(data);
+        await FirebaseFirestore.instance
+            .collection('BillPaymentEntry')
+            .add(data);
 
         // Show success dialog
         _showSuccessDialog();
       } catch (e) {
-        print('Error saving data: $e');
+        // print('Error saving data: $e');
         _showErrorDialog();
       }
     }
@@ -81,12 +66,14 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Data Saved Successfully'),
-          content: const Text('Your data has been successfully stored in Firestore.'),
+          content:
+              const Text('Your data has been successfully stored in Firestore.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close the success dialog
-                Navigator.pop(context); // Navigate back to Home screen (pop the BillPaymentEntry page)
+                Navigator.pop(
+                    context); // Navigate back to Home screen (pop the BillPaymentEntry page)
               },
               child: const Text('OK'),
             ),
@@ -128,40 +115,9 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        // Set the text of the controller
+        _dateController.text = _selectedDate!.toLocal().toString().split(' ')[0];
       });
-    }
-  }
-
-  // Function to pick an image from the gallery or take a photo
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery); // Pick image from gallery
-    if (pickedFile != null) {
-      String? mimeType = lookupMimeType(pickedFile.path);  // Check MIME type
-
-      // Check if the picked file is an image
-      if (mimeType != null && mimeType.startsWith('image/')) {
-        setState(() {
-          _imageFile = File(pickedFile.path); // Store the picked image file
-        });
-      } else {
-        // Show error if the file is not an image
-        _showErrorDialog();
-      }
-    }
-  }
-
-  // Function to preview image on both mobile and web platforms
-  Widget _buildImagePreview() {
-    if (_imageFile != null) {
-      if (kIsWeb) {
-        // For Web: Use Image.network to display the image using the URL
-        return Image.network(_imageUrl ?? '');  // Use the image URL obtained after upload
-      } else {
-        // For Mobile (Android/iOS): Use Image.file to display the selected image
-        return Image.file(_imageFile!, height: 100, width: 100);
-      }
-    } else {
-      return const Text('No image selected.');
     }
   }
 
@@ -171,7 +127,7 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
       appBar: AppBar(
         title: const Text('Bill/Payment Entry'),
       ),
-      body: SingleChildScrollView(  // Wrap the entire content with SingleChildScrollView
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Form(
@@ -209,14 +165,13 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
                   onTap: () => _selectDate(context),
                   child: AbsorbPointer(
                     child: TextFormField(
-                      decoration: InputDecoration(
+                      controller: _dateController, // Use controller
+                      decoration: const InputDecoration(
                         labelText: 'Date',
-                        hintText: _selectedDate == null
-                            ? 'Select Date'
-                            : _selectedDate?.toLocal().toString().split(' ')[0],
                       ),
                       validator: (value) {
-                        if (_selectedDate == null) {
+                        if (value == null ||
+                            value.isEmpty) { // Validate based on controller
                           return 'Please select a date';
                         }
                         return null;
@@ -231,18 +186,6 @@ class BillPaymentEntryPageState extends State<BillPaymentEntryPage> {
                   ),
                   maxLines: 3,
                 ),
-                const SizedBox(height: 20),
-
-                // Image Picker (Button to select image)
-                ElevatedButton(
-                  onPressed: _pickImage,
-                  child: const Text('Pick Image'),
-                ),
-                const SizedBox(height: 20),
-
-                // Display image preview (if selected)
-                _buildImagePreview(),
-
                 const SizedBox(height: 20),
                 Center(
                   child: ElevatedButton(

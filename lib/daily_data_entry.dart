@@ -19,6 +19,20 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
   final TextEditingController _expenseCashController = TextEditingController();
   final TextEditingController _expenseOnlineController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _dateController =
+      TextEditingController(); // Controller for the date field
+
+  @override
+  void dispose() {
+    // Dispose controllers to free up resources
+    _incomeCashController.dispose();
+    _incomeOnlineController.dispose();
+    _expenseCashController.dispose();
+    _expenseOnlineController.dispose();
+    _descriptionController.dispose();
+    _dateController.dispose();
+    super.dispose();
+  }
 
   // Function to handle form submission and store data in Firestore
   void _submitForm() async {
@@ -28,13 +42,15 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
 
       // Creating the data model with actual values from controllers
       var data = {
-        'incomeCash': _incomeCashController.text,  // Use .text to get the value from the controller
+        'incomeCash':
+            _incomeCashController.text, // Use .text to get the value from the controller
         'incomeOnline': _incomeOnlineController.text,
         'expenseCash': _expenseCashController.text,
         'expenseOnline': _expenseOnlineController.text,
         'description': _descriptionController.text,
-        'date': _selectedDate?.toLocal().toString().split(' ')[0] ?? 'No date selected',
-        'timestamp': timestamp,  // Store the date/time when this data was entered
+        'date': _selectedDate?.toLocal().toString().split(' ')[0] ??
+            'No date selected',
+        'timestamp': timestamp, // Store the date/time when this data was entered
       };
 
       // Show the preview dialog before saving to Firestore
@@ -51,7 +67,8 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
                   Text('Income (Online): ${_incomeOnlineController.text}'),
                   Text('Expense (Cash): ${_expenseCashController.text}'),
                   Text('Expense (Online): ${_expenseOnlineController.text}'),
-                  Text('Date: ${_selectedDate?.toLocal().toString().split(' ')[0] ?? 'No date selected'}'),
+                  Text(
+                      'Date: ${_selectedDate?.toLocal().toString().split(' ')[0] ?? 'No date selected'}'),
                   Text('Description: ${_descriptionController.text}'),
                 ],
               ),
@@ -67,7 +84,9 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
                 onPressed: () async {
                   // Try to save the data to Firestore
                   try {
-                    await FirebaseFirestore.instance.collection('DailyDataEntry').add(data);
+                    await FirebaseFirestore.instance
+                        .collection('DailyDataEntry')
+                        .add(data);
 
                     // If successful, show success message and navigate back to home page
                     Navigator.pop(context); // Close the preview dialog
@@ -94,12 +113,14 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Data Saved Successfully'),
-          content: const Text('Your data has been successfully stored in Firestore.'),
+          content:
+              const Text('Your data has been successfully stored in Firestore.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close the success dialog
-                Navigator.pop(context); // Navigate back to Home screen (pop the DailyDataEntry page)
+                Navigator.pop(
+                    context); // Navigate back to Home screen (pop the DailyDataEntry page)
               },
               child: const Text('OK'),
             ),
@@ -133,13 +154,16 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedDate ??
+          DateTime.now(), // Open picker with selected date or today
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        // Set the text of the controller to the formatted date
+        _dateController.text = _selectedDate!.toLocal().toString().split(' ')[0];
       });
     }
   }
@@ -154,99 +178,96 @@ class DailyDataEntryPageState extends State<DailyDataEntryPage> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              TextFormField(
-                controller: _incomeCashController,
-                decoration: const InputDecoration(
-                  labelText: 'Income (Cash)',
+          child: SingleChildScrollView(
+            // Added SingleChildScrollView to prevent overflow
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                TextFormField(
+                  controller: _incomeCashController,
+                  decoration: const InputDecoration(
+                    labelText: 'Income (Cash)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter income (cash)';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter income (cash)';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _incomeOnlineController,
-                decoration: const InputDecoration(
-                  labelText: 'Income (Online)',
+                TextFormField(
+                  controller: _incomeOnlineController,
+                  decoration: const InputDecoration(
+                    labelText: 'Income (Online)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter income (online)';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter income (online)';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _expenseCashController,
-                decoration: const InputDecoration(
-                  labelText: 'Expense (Cash)',
+                TextFormField(
+                  controller: _expenseCashController,
+                  decoration: const InputDecoration(
+                    labelText: 'Expense (Cash)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter expense (cash)';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter expense (cash)';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _expenseOnlineController,
-                decoration: const InputDecoration(
-                  labelText: 'Expense (Online)',
+                TextFormField(
+                  controller: _expenseOnlineController,
+                  decoration: const InputDecoration(
+                    labelText: 'Expense (Online)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter expense (online)';
+                    }
+                    return null;
+                  },
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter expense (online)';
-                  }
-                  return null;
-                },
-              ),
-              GestureDetector(
-                onTap: () => _selectDate(context),
-                child: AbsorbPointer(
-                  child: TextFormField(
-                    decoration: InputDecoration(
-                      labelText: 'Date',
-                      hintText: _selectedDate == null
-                          ? 'Select Date'
-                          : _selectedDate?.toLocal().toString().split(' ')[0],
+                GestureDetector(
+                  onTap: () => _selectDate(context),
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      controller:
+                          _dateController, // Use the controller for the date field
+                      decoration: const InputDecoration(
+                        labelText: 'Date',
+                        hintText: 'Select Date',
+                      ),
+                      validator: (value) {
+                        if (_selectedDate == null) {
+                          return 'Please select a date';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (_selectedDate == null) {
-                        return 'Please select a date';
-                      }
-                      return null;
-                    },
                   ),
                 ),
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                  ),
+                  maxLines: 3,
                 ),
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: const Text('Submit'),
-              ),
-            ],
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _submitForm,
+                  child: const Text('Submit'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
