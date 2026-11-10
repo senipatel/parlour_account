@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsUserData(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if ownsUserData(userId);
+    }
+
+    // All other paths, including legacy financial collections, stay private.
+    // Migrate the legacy records before deploying these rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

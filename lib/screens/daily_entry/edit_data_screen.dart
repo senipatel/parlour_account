@@ -1,5 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:parlour_account/services/firebase/account_data.dart';
+import 'package:parlour_account/utils/money_amount.dart';
 
 class EditDailyDataPage extends StatefulWidget {
   final Map<String, dynamic> entryData;
@@ -29,14 +30,14 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
   void initState() {
     super.initState();
     _dateController = TextEditingController(text: widget.entryData['date']);
-    _incomeCashController =
-        TextEditingController(text: widget.entryData['incomeCash']?.toString());
-    _incomeOnlineController =
-        TextEditingController(text: widget.entryData['incomeOnline']?.toString());
-    _expenseCashController =
-        TextEditingController(text: widget.entryData['expenseCash']?.toString());
-    _expenseOnlineController =
-        TextEditingController(text: widget.entryData['expenseOnline']?.toString());
+    _incomeCashController = TextEditingController(
+        text: MoneyAmount.formatStored(widget.entryData['incomeCash']));
+    _incomeOnlineController = TextEditingController(
+        text: MoneyAmount.formatStored(widget.entryData['incomeOnline']));
+    _expenseCashController = TextEditingController(
+        text: MoneyAmount.formatStored(widget.entryData['expenseCash']));
+    _expenseOnlineController = TextEditingController(
+        text: MoneyAmount.formatStored(widget.entryData['expenseOnline']));
     _descriptionController =
         TextEditingController(text: widget.entryData['description']);
   }
@@ -56,18 +57,18 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
   Future<void> _updateData() async {
     final updatedData = {
       'date': _dateController.text,
-      'incomeCash': _incomeCashController.text ,
-      'incomeOnline': _incomeOnlineController.text,
-      'expenseCash': _expenseCashController.text,
-      'expenseOnline': _expenseOnlineController.text,
+      'incomeCash': MoneyAmount.rupeesToPaise(_incomeCashController.text)!,
+      'incomeOnline': MoneyAmount.rupeesToPaise(_incomeOnlineController.text)!,
+      'expenseCash': MoneyAmount.rupeesToPaise(_expenseCashController.text)!,
+      'expenseOnline':
+          MoneyAmount.rupeesToPaise(_expenseOnlineController.text)!,
       'description': _descriptionController.text,
     };
 
     // Compare if data has actually changed
     if (updatedData.toString() != widget.entryData.toString()) {
       try {
-        await FirebaseFirestore.instance
-            .collection('DailyDataEntry')
+        await AccountData.collection('DailyDataEntry')
             .doc(widget.docId)
             .update(updatedData);
 
@@ -135,7 +136,8 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
     if (selectedDate != null) {
       // Update the text controller with the selected date
       setState(() {
-        _dateController.text = "${selectedDate.toLocal()}".split(' ')[0]; // Format as YYYY-MM-DD
+        _dateController.text =
+            "${selectedDate.toLocal()}".split(' ')[0]; // Format as YYYY-MM-DD
       });
     }
   }
@@ -157,7 +159,8 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
                 controller: _dateController,
                 decoration: const InputDecoration(labelText: 'Date'),
                 readOnly: true,
-                onTap: () => _selectDate(context), // Open the date picker when tapped
+                onTap: () =>
+                    _selectDate(context), // Open the date picker when tapped
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please select a date';
@@ -165,54 +168,56 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
               // Income (Cash) field
               TextFormField(
                 controller: _incomeCashController,
                 decoration: const InputDecoration(labelText: 'Income (Cash)'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter income (Cash)';
-                  }
-                  return null;
-                },
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => MoneyAmount.validateRupees(
+                  value,
+                  label: 'income (cash)',
+                ),
               ),
+              const SizedBox(height: 12),
               // Income (Online) field
               TextFormField(
                 controller: _incomeOnlineController,
                 decoration: const InputDecoration(labelText: 'Income (Online)'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter income (Online)';
-                  }
-                  return null;
-                },
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => MoneyAmount.validateRupees(
+                  value,
+                  label: 'income (online)',
+                ),
               ),
+              const SizedBox(height: 12),
               // Expense (Cash) field
               TextFormField(
                 controller: _expenseCashController,
                 decoration: const InputDecoration(labelText: 'Expense (Cash)'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter expense (Cash)';
-                  }
-                  return null;
-                },
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => MoneyAmount.validateRupees(
+                  value,
+                  label: 'expense (cash)',
+                ),
               ),
+              const SizedBox(height: 12),
               // Expense (Online) field
               TextFormField(
                 controller: _expenseOnlineController,
-                decoration: const InputDecoration(labelText: 'Expense (Online)'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter expense (Online)';
-                  }
-                  return null;
-                },
+                decoration:
+                    const InputDecoration(labelText: 'Expense (Online)'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) => MoneyAmount.validateRupees(
+                  value,
+                  label: 'expense (online)',
+                ),
               ),
+              const SizedBox(height: 12),
               // Description field
               TextFormField(
                 controller: _descriptionController,

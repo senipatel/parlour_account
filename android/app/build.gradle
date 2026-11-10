@@ -8,6 +8,26 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def releaseStorePath = System.getenv("PARLOUR_RELEASE_STORE_FILE")
+def releaseStorePassword = System.getenv("PARLOUR_RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("PARLOUR_RELEASE_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("PARLOUR_RELEASE_KEY_PASSWORD")
+def releaseSigningValues = [
+    releaseStorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+]
+def hasReleaseSigning = releaseSigningValues.every { value ->
+    value != null && !value.trim().isEmpty()
+}
+def hasPartialReleaseSigning = releaseSigningValues.any { value ->
+    value != null && !value.trim().isEmpty()
+}
+if (hasPartialReleaseSigning && !hasReleaseSigning) {
+    throw new GradleException("Set all four PARLOUR_RELEASE_* signing variables or leave them all unset.")
+}
+
 android {
     namespace = "com.example.parlour_account"
     compileSdk = flutter.compileSdkVersion
@@ -33,10 +53,22 @@ android {
         versionName flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Add your own signing config for the release build
-            signingConfig = signingConfigs.debug
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
         }
     }
 }

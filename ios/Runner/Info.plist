@@ -6,6 +6,8 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Parlour Account</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Select a photo to use on your parlour account profile.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +47,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.597433345372-p5chgrbcqfun6fdd1egcur35ou3lh663</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
