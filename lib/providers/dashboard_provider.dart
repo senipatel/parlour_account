@@ -60,10 +60,12 @@ class DashboardProvider extends ChangeNotifier {
             .where('date', isLessThanOrEqualTo: todayKey)
             .get(),
         AccountData.collection('BillPaymentEntry')
-            .where('date', isEqualTo: todayKey)
+            .where('date', isGreaterThanOrEqualTo: firstKey)
+            .where('date', isLessThanOrEqualTo: todayKey)
             .get(),
         AccountData.collection('BillPaymentEntry')
-            .where('paidDate', isEqualTo: todayKey)
+            .where('paidDate', isGreaterThanOrEqualTo: firstKey)
+            .where('paidDate', isLessThanOrEqualTo: todayKey)
             .get(),
         AccountData.collection('BillPaymentEntry')
             .where('dueDate', isLessThanOrEqualTo: todayKey)
@@ -74,8 +76,8 @@ class DashboardProvider extends ChangeNotifier {
       for (var i = 0; i < 7; i++) {
         trendByDate[_dateKey(firstDay.add(Duration(days: i)))] = [0, 0];
       }
-      var incomeToday = 0;
-      var expensesToday = 0;
+      var incomeThisWeek = 0;
+      var expensesThisWeek = 0;
       for (final doc in results[0].docs) {
         final data = doc.data();
         final income = (MoneyAmount.paiseFromStored(data['incomeCash']) ?? 0) +
@@ -89,16 +91,14 @@ class DashboardProvider extends ChangeNotifier {
           point[0] += income;
           point[1] += expenses;
         }
-        if (data['date'] == todayKey) {
-          incomeToday += income;
-          expensesToday += expenses;
-        }
+        incomeThisWeek += income;
+        expensesThisWeek += expenses;
       }
 
       final paidToday = <String, Map<String, dynamic>>{};
       for (final doc in results[1].docs) {
         final data = doc.data();
-        if (data['paidDate'] == todayKey || data['paidDate'] == null) {
+        if (data['paidDate'] == null) {
           paidToday[doc.id] = data;
         }
       }
@@ -119,8 +119,8 @@ class DashboardProvider extends ChangeNotifier {
       }
 
       _totals = DashboardTotals(
-        income: incomeToday,
-        expenses: expensesToday,
+        income: incomeThisWeek,
+        expenses: expensesThisWeek,
         billsPaid: billsPaid,
         due: due,
       );

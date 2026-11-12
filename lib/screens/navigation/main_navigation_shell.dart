@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'package:parlour_account/screens/customers/customer_appointment_screen.dart';
+import 'package:parlour_account/providers/dashboard_provider.dart';
 import 'package:parlour_account/screens/dashboard/dashboard_screen.dart';
+import 'package:parlour_account/screens/navigation/entries_screen.dart';
 import 'package:parlour_account/screens/navigation/more_screen.dart';
 import 'package:parlour_account/screens/reports/reports_screen.dart';
 
@@ -22,9 +24,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       label: 'Overview',
     ),
     NavigationDestination(
-      icon: Icon(Icons.people_outline_rounded),
-      selectedIcon: Icon(Icons.people_rounded),
-      label: 'Customers',
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long_rounded),
+      label: 'Entries',
     ),
     NavigationDestination(
       icon: Icon(Icons.insights_outlined),
@@ -40,24 +42,33 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   late final List<Widget> _pages = const [
     DashboardPage(),
-    CustomerAppointmentPage(),
+    EntriesPage(),
     ReportsPage(),
     MorePage(),
   ];
 
+  void _selectTab(int index) {
+    setState(() => _selectedIndex = index);
+    if (index <= 1) context.read<DashboardProvider>().load();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 760;
-        return Scaffold(
+    return PopScope<Object?>(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectedIndex != 0) _selectTab(0);
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 760;
+          return Scaffold(
           body: Row(
             children: [
               if (wide)
                 NavigationRail(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) =>
-                      setState(() => _selectedIndex = index),
+                  onDestinationSelected: _selectTab,
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     for (final item in _destinations)
@@ -77,12 +88,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               ? null
               : NavigationBar(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) =>
-                      setState(() => _selectedIndex = index),
+                  onDestinationSelected: _selectTab,
                   destinations: _destinations,
                 ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

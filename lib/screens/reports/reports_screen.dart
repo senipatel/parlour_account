@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:parlour_account/app/theme/app_theme.dart';
@@ -37,7 +39,10 @@ class _ReportsPageState extends State<ReportsPage> {
       firstDate: DateTime(2000),
       lastDate: _endDate,
     );
-    if (picked != null) setState(() => _startDate = picked);
+    if (picked != null) {
+      setState(() => _startDate = picked);
+      _runReport();
+    }
   }
 
   Future<void> _chooseEndDate() async {
@@ -47,7 +52,10 @@ class _ReportsPageState extends State<ReportsPage> {
       firstDate: _startDate,
       lastDate: DateTime(2101),
     );
-    if (picked != null) setState(() => _endDate = picked);
+    if (picked != null) {
+      setState(() => _endDate = picked);
+      _runReport();
+    }
   }
 
   void _runReport() {
@@ -87,82 +95,87 @@ class _ReportsPageState extends State<ReportsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Date-range reports')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
+      appBar: AppBar(title: const Text('Month analysis report')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _chooseStartDate,
-                  icon: const Icon(Icons.calendar_month),
-                  label: Text('From\n${_dateText(_startDate)}'),
-                ),
+              Text('Monthly cash flow',
+                  style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 4),
+              Text('Choose a date range to update the report.',
+                  style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _chooseStartDate,
+                      icon: const Icon(Icons.calendar_month),
+                      label: Text(
+                        'From\n${_dateText(_startDate)}',
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _chooseEndDate,
+                      icon: const Icon(Icons.event),
+                      label: Text(
+                        'To\n${_dateText(_endDate)}',
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _chooseEndDate,
-                  icon: const Icon(Icons.event),
-                  label: Text('Through\n${_dateText(_endDate)}'),
-                ),
+              const SizedBox(height: 12),
+              FutureBuilder<FinancialReport>(
+                future: _reportFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Text('Could not load this report.'),
+                            TextButton(
+                              onPressed: _runReport,
+                              child: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  final report = snapshot.data;
+                  if (report == null) return const SizedBox.shrink();
+                  return _buildReport(report);
+                },
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _runReport,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Run report'),
-          ),
-          const SizedBox(height: 12),
-          FutureBuilder<FinancialReport>(
-            future: _reportFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError) {
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Text('Could not load this report.'),
-                        TextButton(
-                          onPressed: _runReport,
-                          child: const Text('Try again'),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              final report = snapshot.data;
-              if (report == null) return const SizedBox.shrink();
-              return _buildReport(report);
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildReport(FinancialReport report) {
-    final categoryRows = report.categoryTotals.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${report.startDate} to ${report.endDate}',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        if (report.wasLimited)
+        if (report.wasLimited) ...[
           const Card(
             child: Padding(
               padding: EdgeInsets.all(12),
@@ -171,25 +184,12 @@ class _ReportsPageState extends State<ReportsPage> {
               ),
             ),
           ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _MetricCard('Income', report.incomePaise, AppTheme.midnight),
-            _MetricCard('Daily expenses', report.operatingExpensesPaise,
-                AppTheme.slateBlue),
-            _MetricCard(
-                'Bill payments', report.billPaymentsPaise, AppTheme.steel),
-            _MetricCard('Cash net', report.cashNetPaise,
-                Theme.of(context).colorScheme.primary),
-            _MetricCard('Invoices issued', report.billInvoicesPaise,
-                AppTheme.slateBlue),
-            _MetricCard('Outstanding on invoices', report.billOutstandingPaise,
-                AppTheme.graphite),
-          ],
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 8),
+        ],
+        _CashFlowCard(report: report),
+        const SizedBox(height: 12),
+        _ReportMetricGrid(report: report),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -216,93 +216,438 @@ class _ReportsPageState extends State<ReportsPage> {
             padding: EdgeInsets.all(8),
             child: Center(child: CircularProgressIndicator()),
           ),
-        const SizedBox(height: 24),
-        Text('Category breakdown',
-            style: Theme.of(context).textTheme.titleLarge),
-        if (categoryRows.isEmpty)
-          const ListTile(title: Text('No categorized activity in this range.'))
-        else
-          for (final row in categoryRows)
-            ListTile(
-              dense: true,
-              title: Text(row.key),
-              trailing: Text('₹${MoneyAmount.formatPaise(row.value)}'),
-            ),
         const SizedBox(height: 12),
-        Text('Transactions', style: Theme.of(context).textTheme.titleLarge),
-        if (report.lines.isEmpty)
-          const ListTile(title: Text('No transactions in this date range.'))
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Type')),
-                DataColumn(label: Text('Category')),
-                DataColumn(label: Text('Payee')),
-                DataColumn(label: Text('Description')),
-                DataColumn(label: Text('Amount')),
-                DataColumn(label: Text('Paid')),
-                DataColumn(label: Text('Outstanding')),
-                DataColumn(label: Text('Status')),
-              ],
-              rows: report.lines
-                  .map(
-                    (line) => DataRow(cells: [
-                      DataCell(Text(line.date)),
-                      DataCell(Text(line.type)),
-                      DataCell(Text(line.category)),
-                      DataCell(Text(line.payee)),
-                      DataCell(Text(line.description)),
-                      DataCell(Text(
-                          '₹${MoneyAmount.formatPaise(line.amountPaise)}')),
-                      DataCell(
-                          Text('₹${MoneyAmount.formatPaise(line.paidPaise)}')),
-                      DataCell(Text(
-                          '₹${MoneyAmount.formatPaise(line.outstandingPaise)}')),
-                      DataCell(Text(line.status.isEmpty ? '—' : line.status)),
-                    ]),
-                  )
-                  .toList(),
-            ),
-          ),
+        _ReportRecordSection(
+          title: 'Daily entries',
+          icon: Icons.receipt_long_outlined,
+          records: [
+            for (final line in report.lines)
+              if (line.type == 'Income' || line.type == 'Expense') line,
+          ],
+        ),
+        const SizedBox(height: 10),
+        _ReportRecordSection(
+          title: 'Bills and payments',
+          icon: Icons.payments_outlined,
+          records: [
+            for (final line in report.lines)
+              if (line.type == 'Bill invoice' || line.type == 'Bill payment')
+                line,
+          ],
+        ),
       ],
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard(this.label, this.amountPaise, this.color);
+class _ReportRecordSection extends StatelessWidget {
+  const _ReportRecordSection({
+    required this.title,
+    required this.icon,
+    required this.records,
+  });
 
-  final String label;
-  final int amountPaise;
-  final Color color;
+  final String title;
+  final IconData icon;
+  final List<ReportLine> records;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          leading: Icon(icon, color: Theme.of(context).colorScheme.secondary),
+          title: Text(title),
+          subtitle: Text('${records.length} record(s)'),
+          children: [
+            if (records.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 18),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('No records in this date range.'),
+                ),
+              )
+            else
+              for (var i = 0; i < records.length; i++) ...[
+                _ReportRecordTile(line: records[i]),
+                if (i < records.length - 1)
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+              ],
+          ],
+        ),
+      );
+}
+
+class _ReportRecordTile extends StatelessWidget {
+  const _ReportRecordTile({required this.line});
+
+  final ReportLine line;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 170,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
+    final isInvoice = line.type == 'Bill invoice';
+    final detail = line.payee.isNotEmpty ? line.payee : line.category;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.circle, size: 12, color: color),
-              const SizedBox(height: 6),
-              Text(label),
-              const SizedBox(height: 4),
-              Text(
-                '₹${MoneyAmount.formatPaise(amountPaise)}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${line.type}  ·  ${line.date}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 112),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _rupees(line.amountPaise),
+                    style: AppTheme.currencyStat.copyWith(fontSize: 16),
+                  ),
+                ),
               ),
             ],
           ),
+          if (line.description.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              line.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (line.status.isNotEmpty || line.dueDate.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (line.status.isNotEmpty)
+                  _RecordTag(label: line.status, color: AppTheme.slateBlue),
+                if (isInvoice && line.paidPaise > 0)
+                  _RecordTag(
+                    label: 'Paid ${_rupees(line.paidPaise)}',
+                    color: AppTheme.midnight,
+                  ),
+                if (isInvoice && line.outstandingPaise > 0)
+                  _RecordTag(
+                    label: 'Due ${_rupees(line.outstandingPaise)}',
+                    color: AppTheme.rose,
+                  ),
+                if (line.dueDate.isNotEmpty)
+                  _RecordTag(
+                    label: 'Due date ${line.dueDate}',
+                    color: AppTheme.rose,
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecordTag extends StatelessWidget {
+  const _RecordTag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      );
+}
+
+class _CashFlowCard extends StatelessWidget {
+  const _CashFlowCard({required this.report});
+
+  final FinancialReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final slices = [
+      _CashFlowSlice('Income & services', report.incomePaise, AppTheme.midnight),
+      _CashFlowSlice('Daily salon expenses', report.operatingExpensesPaise,
+          AppTheme.slateBlue),
+      _CashFlowSlice('Vendor bills paid', report.billPaymentsPaise, AppTheme.rose),
+    ];
+    final total = slices.fold<int>(0, (sum, slice) => sum + slice.amount);
+    final margin = report.incomePaise == 0
+        ? 0.0
+        : report.cashNetPaise / report.incomePaise * 100;
+    final positive = report.cashNetPaise >= 0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Cash flow',
+                      style: Theme.of(context).textTheme.titleLarge),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (positive
+                            ? AppTheme.slateBlue
+                            : Theme.of(context).colorScheme.error)
+                        .withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    positive ? 'Balanced' : 'Deficit',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: positive
+                              ? AppTheme.slateBlue
+                              : Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text('Income, operating costs, and bills paid',
+                style: Theme.of(context).textTheme.bodySmall),
+            SizedBox(
+              width: double.infinity,
+              height: 218,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(202, 202),
+                    painter: _CashFlowDonutPainter(slices, total),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('NET PROFIT',
+                          style: Theme.of(context).textTheme.labelSmall),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _rupees(report.cashNetPaise),
+                          style: AppTheme.currencyStat.copyWith(fontSize: 24),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${margin >= 0 ? '+' : ''}${margin.toStringAsFixed(1)}% net margin',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(
+                              color: positive
+                                  ? AppTheme.slateBlue
+                                  : Theme.of(context).colorScheme.error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            for (final slice in slices)
+              _CashFlowLegend(
+                slice: slice,
+                percent: total == 0 ? 0 : slice.amount / total * 100,
+              ),
+          ],
         ),
       ),
     );
   }
 }
+
+class _CashFlowSlice {
+  const _CashFlowSlice(this.label, this.amount, this.color);
+
+  final String label;
+  final int amount;
+  final Color color;
+}
+
+class _CashFlowDonutPainter extends CustomPainter {
+  const _CashFlowDonutPainter(this.slices, this.total);
+
+  final List<_CashFlowSlice> slices;
+  final int total;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final track = Paint()
+      ..color = AppTheme.mist
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 23;
+    canvas.drawCircle(center, radius, track);
+    if (total <= 0) return;
+
+    var start = -math.pi / 2;
+    for (final slice in slices) {
+      if (slice.amount <= 0) continue;
+      final sweep = 2 * math.pi * slice.amount / total;
+      final paint = Paint()
+        ..color = slice.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 23
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(rect, start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CashFlowDonutPainter oldDelegate) =>
+      oldDelegate.total != total || oldDelegate.slices != slices;
+}
+
+class _CashFlowLegend extends StatelessWidget {
+  const _CashFlowLegend({required this.slice, required this.percent});
+
+  final _CashFlowSlice slice;
+  final double percent;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                  color: slice.color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 9),
+            Expanded(child: Text(slice.label)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: slice.color.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${percent.toStringAsFixed(0)}%',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: slice.color,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(_rupees(slice.amount),
+                style: AppTheme.currencyStat.copyWith(fontSize: 15)),
+          ],
+        ),
+      );
+}
+
+class _ReportMetricGrid extends StatelessWidget {
+  const _ReportMetricGrid({required this.report});
+
+  final FinancialReport report;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 10.0;
+          final width = (constraints.maxWidth - gap) / 2;
+          final metrics = [
+            _ReportMetric('Total income', report.incomePaise,
+                Icons.south_west_rounded, AppTheme.slateBlue),
+            _ReportMetric('Daily expenses', report.operatingExpensesPaise,
+                Icons.north_east_rounded, AppTheme.rose),
+            _ReportMetric('Bills settled', report.billPaymentsPaise,
+                Icons.receipt_long_outlined, AppTheme.midnight),
+            _ReportMetric('Vendor dues', report.billOutstandingPaise,
+                Icons.account_balance_wallet_outlined, AppTheme.rose),
+          ];
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final metric in metrics)
+                SizedBox(width: width, child: metric),
+            ],
+          );
+        },
+      );
+}
+
+class _ReportMetric extends StatelessWidget {
+  const _ReportMetric(this.label, this.amount, this.icon, this.color);
+
+  final String label;
+  final int amount;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 8),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 3),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(_rupees(amount),
+                    style: AppTheme.currencyStat.copyWith(fontSize: 19)),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+String _rupees(int paise) => '\u20B9${MoneyAmount.formatPaise(paise)}';

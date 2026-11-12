@@ -149,7 +149,7 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
         title: const Text('Edit Daily Data Entry'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: ListView(

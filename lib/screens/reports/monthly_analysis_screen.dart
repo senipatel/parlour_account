@@ -37,6 +37,13 @@ class _MonthlyAnalysisPageState extends State<MonthlyAnalysisPage> {
     }
   }
 
+  Future<void> _selectPeriod(
+      MonthlyReportProvider provider, int index) async {
+    if (index < 0 || index >= provider.periods.length) return;
+    provider.selectPeriod(provider.periods[index].key);
+    await provider.loadReport();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
@@ -71,48 +78,66 @@ class _MonthlyAnalysisPageState extends State<MonthlyAnalysisPage> {
               );
             }
             final report = provider.report;
+            final selectedIndex = provider.periods.indexWhere(
+              (period) => period.key == provider.selectedPeriodKey,
+            );
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
               children: [
-                Text('Your month, clearly summarized',
-                    style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 5),
-                Text('Review cash flow and payments in one place.',
-                    style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 20),
+                Text('Report month',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          letterSpacing: .7,
+                          fontWeight: FontWeight.w700,
+                        )),
+                const SizedBox(height: 7),
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
                     child: Row(
                       children: [
+                        const Icon(Icons.calendar_month_outlined, size: 20),
+                        const SizedBox(width: 9),
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            key: ValueKey(provider.selectedPeriodKey),
-                            initialValue: provider.selectedPeriodKey,
-                            decoration: const InputDecoration(
-                              labelText: 'Report month',
-                              prefixIcon: Icon(Icons.calendar_month_outlined),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: provider.selectedPeriodKey,
+                              items: [
+                                for (final period in provider.periods)
+                                  DropdownMenuItem(
+                                    value: period.key,
+                                    child: Text(period.label),
+                                  ),
+                              ],
+                              onChanged: provider.isLoadingReport
+                                  ? null
+                                  : (value) async {
+                                      provider.selectPeriod(value);
+                                      await provider.loadReport();
+                                    },
                             ),
-                            items: [
-                              for (final period in provider.periods)
-                                DropdownMenuItem(
-                                  value: period.key,
-                                  child: Text(period.label),
-                                ),
-                            ],
-                            onChanged: (value) async {
-                              provider.selectPeriod(value);
-                              await provider.loadReport();
-                            },
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        IconButton.filled(
-                          tooltip: 'Load selected month',
-                          onPressed: provider.isLoadingReport
+                        const SizedBox(width: 6),
+                        IconButton.filledTonal(
+                          tooltip: 'Previous month',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: provider.isLoadingReport ||
+                                  selectedIndex < 0 ||
+                                  selectedIndex >= provider.periods.length - 1
                               ? null
-                              : provider.loadReport,
-                          icon: const Icon(Icons.arrow_forward_rounded),
+                              : () => _selectPeriod(provider, selectedIndex + 1),
+                          icon: const Icon(Icons.chevron_left_rounded),
+                        ),
+                        const SizedBox(width: 5),
+                        IconButton.filled(
+                          tooltip: 'Next month',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: provider.isLoadingReport || selectedIndex <= 0
+                              ? null
+                              : () => _selectPeriod(provider, selectedIndex - 1),
+                          icon: const Icon(Icons.chevron_right_rounded),
                         ),
                       ],
                     ),
@@ -170,18 +195,50 @@ class _MonthlyDonutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final slices = <_Slice>[
-      _Slice('Income', report.income, AppTheme.midnight),
-      _Slice('Daily expenses', report.dailyExpenses, AppTheme.slateBlue),
-      _Slice('Bill payments', report.billPaid, AppTheme.steel),
+      _Slice('Income', report.income, AppTheme.slateBlue),
+      _Slice('Daily expenses', report.dailyExpenses, AppTheme.rose),
+      _Slice('Bill payments', report.billPaid, AppTheme.midnight),
     ];
     final total = slices.fold<int>(0, (sum, slice) => sum + slice.value);
+    final netMargin = report.income == 0
+        ? 0.0
+        : report.net / report.income * 100;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cash flow', style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Cash flow',
+                      style: Theme.of(context).textTheme.titleLarge),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: report.net >= 0
+                        ? AppTheme.slateBlue.withValues(alpha: .12)
+                        : Theme.of(context)
+                            .colorScheme
+                            .error
+                            .withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    report.net >= 0 ? 'Positive cash flow' : 'Cash deficit',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: report.net >= 0
+                              ? AppTheme.slateBlue
+                              : Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text('Income, daily expenses, and bills paid',
                 style: Theme.of(context).textTheme.bodySmall),
@@ -202,14 +259,21 @@ class _MonthlyDonutCard extends StatelessWidget {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('NET CASH',
+                        Text('NET AFTER OUTFLOWS',
                             style: Theme.of(context).textTheme.labelSmall),
                         const SizedBox(height: 4),
                         FittedBox(
                           child: Text(
                             '₹${MoneyAmount.formatPaise(report.net)}',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: AppTheme.currencyStat.copyWith(
+                              color: AppTheme.slateBlue,
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${netMargin >= 0 ? '+' : ''}${netMargin.toStringAsFixed(1)}% of income',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
@@ -299,7 +363,7 @@ class _SliceLegend extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(width: 12),
             Text('₹${MoneyAmount.formatPaise(slice.value)}',
-                style: Theme.of(context).textTheme.titleMedium),
+                style: AppTheme.currencyStat.copyWith(fontSize: 16)),
           ],
         ),
       );
@@ -317,7 +381,7 @@ class _TotalsGrid extends StatelessWidget {
             children: [
               Expanded(
                   child: _MetricCard(
-                      'Income', report.income, Icons.south_west_rounded)),
+                      'Total income', report.income, Icons.south_west_rounded)),
               const SizedBox(width: 12),
               Expanded(
                   child: _MetricCard('Daily expenses', report.dailyExpenses,
@@ -328,11 +392,11 @@ class _TotalsGrid extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                  child: _MetricCard('Bills paid', report.billPaid,
+                  child: _MetricCard('Bills settled', report.billPaid,
                       Icons.receipt_long_outlined)),
               const SizedBox(width: 12),
               Expanded(
-                  child: _MetricCard('Outstanding', report.billOutstanding,
+                  child: _MetricCard('Vendor dues', report.billOutstanding,
                       Icons.account_balance_wallet_outlined)),
             ],
           ),
@@ -354,14 +418,19 @@ class _MetricCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: AppTheme.slateBlue),
+              Icon(
+                icon,
+                color: label == 'Daily expenses'
+                    ? AppTheme.rose
+                    : AppTheme.slateBlue,
+              ),
               const SizedBox(height: 10),
               Text(label, style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 3),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text('₹${MoneyAmount.formatPaise(amount)}',
-                    style: Theme.of(context).textTheme.titleMedium),
+                    style: AppTheme.currencyStat.copyWith(fontSize: 18)),
               ),
             ],
           ),
@@ -486,11 +555,12 @@ class _InlineError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        color: AppTheme.steel,
+        color: Theme.of(context).colorScheme.errorContainer,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            const Icon(Icons.error_outline, color: AppTheme.graphite),
+            Icon(Icons.error_outline,
+                color: Theme.of(context).colorScheme.onErrorContainer),
             const SizedBox(width: 10),
             Expanded(child: Text(message)),
           ]),

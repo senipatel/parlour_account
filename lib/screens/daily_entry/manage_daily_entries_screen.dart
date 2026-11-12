@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/services/firebase/account_data.dart';
 import 'package:parlour_account/screens/daily_entry/edit_data_screen.dart';
 import 'package:parlour_account/utils/month_period.dart';
@@ -138,7 +139,7 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
         title: const Text('Edit Daily Data Entries'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 12 : 20),
         child: Column(
           children: [
             // Month and Year input form
@@ -204,74 +205,29 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
                                   'No data found for this month and year'));
                         }
 
-                        // Inside the StreamBuilder, replace the DataTable widget with this:
-
-                        return SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              SingleChildScrollView(
-                                scrollDirection: Axis
-                                    .horizontal, // This enables horizontal scrolling
-                                child: DataTable(
-                                  columns: const [
-                                    DataColumn(label: Text('Date')),
-                                    DataColumn(label: Text('Income (Cash)')),
-                                    DataColumn(label: Text('Income (Online)')),
-                                    DataColumn(label: Text('Expense (Cash)')),
-                                    DataColumn(label: Text('Expense (Online)')),
-                                    DataColumn(label: Text('Description')),
-                                    DataColumn(label: Text('Actions')),
-                                  ],
-                                  rows: documents.map((entry) {
-                                    final data =
-                                        entry.data() as Map<String, dynamic>;
-                                    final docId = entry.id;
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(Text(data['date'] ?? 'N/A')),
-                                        DataCell(Text(MoneyAmount.formatStored(
-                                            data['incomeCash']))),
-                                        DataCell(Text(MoneyAmount.formatStored(
-                                            data['incomeOnline']))),
-                                        DataCell(Text(MoneyAmount.formatStored(
-                                            data['expenseCash']))),
-                                        DataCell(Text(MoneyAmount.formatStored(
-                                            data['expenseOnline']))),
-                                        DataCell(
-                                            Text(data['description'] ?? '')),
-                                        DataCell(Row(
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.edit),
-                                              onPressed: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        EditDailyDataPage(
-                                                      entryData: data,
-                                                      docId: docId,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete),
-                                              onPressed: () {
-                                                _showDeleteConfirmationDialog(
-                                                    docId, data);
-                                              },
-                                            ),
-                                          ],
-                                        )),
-                                      ],
-                                    );
-                                  }).toList(),
+                        return ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          itemCount: documents.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final entry = documents[index];
+                            final data = entry.data() as Map<String, dynamic>;
+                            return _DailyEntryRecordCard(
+                              data: data,
+                              onEdit: () => Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditDailyDataPage(
+                                    entryData: data,
+                                    docId: entry.id,
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
+                              onDelete: () =>
+                                  _showDeleteConfirmationDialog(entry.id, data),
+                            );
+                          },
                         );
                       },
                     )
@@ -288,4 +244,130 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
       ),
     );
   }
+}
+
+class _DailyEntryRecordCard extends StatelessWidget {
+  const _DailyEntryRecordCard({
+    required this.data,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> data;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final description = data['description']?.toString().trim() ?? '';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.calendar_month_outlined,
+                    size: 18, color: theme.colorScheme.secondary),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    data['date']?.toString() ?? 'Date not recorded',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Edit entry',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Delete entry',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onDelete,
+                  color: theme.colorScheme.error,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ],
+            ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 8) / 2;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: _DailyEntryValue(
+                          label: 'Income · cash', value: data['incomeCash']),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _DailyEntryValue(
+                          label: 'Income · online', value: data['incomeOnline']),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _DailyEntryValue(
+                          label: 'Expense · cash', value: data['expenseCash']),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _DailyEntryValue(
+                          label: 'Expense · online', value: data['expenseOnline']),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyEntryValue extends StatelessWidget {
+  const _DailyEntryValue({required this.label, required this.value});
+
+  final String label;
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelSmall),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '\u20B9${MoneyAmount.formatStored(value)}',
+                style: AppTheme.currencyStat.copyWith(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      );
 }

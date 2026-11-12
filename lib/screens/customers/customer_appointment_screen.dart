@@ -136,7 +136,7 @@ class _CustomerAppointmentPageState extends State<CustomerAppointmentPage>
     final isCustomersTab = _tabController.index == 0;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customers and appointments'),
+        title: const Text('Customers'),
         bottom: TabBar(
           controller: _tabController,
           onTap: (_) => setState(() {}),
@@ -244,35 +244,40 @@ class _CustomerList extends StatelessWidget {
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 88),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data();
             final active = data['active'] != false;
             final phone = data['phone'] as String? ?? '';
-            return ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(data['name'] as String? ?? 'Unnamed customer'),
-              subtitle: Text([
-                if (phone.isNotEmpty) phone,
-                if (!active) 'Archived',
-              ].join(' • ')),
-              onTap: () => onHistory(doc),
-              trailing: PopupMenuButton<String>(
-                onSelected: (choice) {
-                  if (choice == 'edit') onEdit(doc);
-                  if (choice == 'history') onHistory(doc);
-                  if (choice == 'toggle') onArchive(doc.id, !active);
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(value: 'history', child: Text('History')),
-                  PopupMenuItem(
-                    value: 'toggle',
-                    child: Text(active ? 'Archive' : 'Restore'),
-                  ),
-                ],
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(data['name'] as String? ?? 'Unnamed customer'),
+                subtitle: Text([
+                  if (phone.isNotEmpty) phone,
+                  if (!active) 'Archived',
+                ].join(' • ')),
+                onTap: () => onHistory(doc),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (choice) {
+                    if (choice == 'edit') onEdit(doc);
+                    if (choice == 'history') onHistory(doc);
+                    if (choice == 'toggle') onArchive(doc.id, !active);
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    const PopupMenuItem(
+                        value: 'history', child: Text('History')),
+                    PopupMenuItem(
+                      value: 'toggle',
+                      child: Text(active ? 'Archive' : 'Restore'),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -320,7 +325,7 @@ class _AppointmentList extends StatelessWidget {
           );
         }
         return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 88),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final doc = docs[index];
@@ -328,30 +333,35 @@ class _AppointmentList extends StatelessWidget {
             final date = (data['startAt'] as Timestamp?)?.toDate();
             final status = data['status'] as String? ?? 'booked';
             final isBooked = status == 'booked';
-            return ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.event_available)),
-              title: Text(data['customerName'] as String? ?? 'Customer'),
-              subtitle: Text(
-                '${data['service'] ?? 'Service'} • ${date == null ? 'Date not set' : _formatDateTime(context, date)} • ${_statusLabel(status)}',
-              ),
-              isThreeLine: true,
-              onTap: () => onEdit(doc),
-              trailing: PopupMenuButton<String>(
-                onSelected: (choice) {
-                  if (choice == 'edit') onEdit(doc);
-                  if (choice == 'complete') onStatus(doc.id, 'completed');
-                  if (choice == 'cancel') onStatus(doc.id, 'cancelled');
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  if (isBooked) ...[
-                    const PopupMenuItem(
-                      value: 'complete',
-                      child: Text('Mark complete'),
-                    ),
-                    const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+            return Card(
+              margin: const EdgeInsets.only(bottom: 10),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.event_available)),
+                title: Text(data['customerName'] as String? ?? 'Customer'),
+                subtitle: Text(
+                  '${data['service'] ?? 'Service'} • ${date == null ? 'Date not set' : _formatDateTime(context, date)} • ${_statusLabel(status)}',
+                ),
+                isThreeLine: true,
+                onTap: () => onEdit(doc),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (choice) {
+                    if (choice == 'edit') onEdit(doc);
+                    if (choice == 'complete') onStatus(doc.id, 'completed');
+                    if (choice == 'cancel') onStatus(doc.id, 'cancelled');
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    if (isBooked) ...[
+                      const PopupMenuItem(
+                        value: 'complete',
+                        child: Text('Mark complete'),
+                      ),
+                      const PopupMenuItem(
+                          value: 'cancel', child: Text('Cancel')),
+                    ],
                   ],
-                ],
+                ),
               ),
             );
           },

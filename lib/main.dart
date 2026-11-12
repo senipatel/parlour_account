@@ -11,7 +11,7 @@ import 'package:parlour_account/providers/monthly_report_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+    options: DefaultFirebaseOptions.currentPlatform, 
   );
   runApp(
     MultiProvider(

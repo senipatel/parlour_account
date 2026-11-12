@@ -1,15 +1,16 @@
+import 'dart:ui' show FontFeature;
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/providers/dashboard_provider.dart';
-import 'package:parlour_account/screens/bills/bill_payment_entry_screen.dart';
-import 'package:parlour_account/screens/customers/customer_appointment_screen.dart';
-import 'package:parlour_account/screens/daily_entry/daily_entry_screen.dart';
 import 'package:parlour_account/screens/profile/profile_screen.dart';
-import 'package:parlour_account/screens/reports/monthly_analysis_screen.dart';
-import 'package:parlour_account/utils/money_amount.dart';
 import 'package:parlour_account/utils/app_navigation.dart';
+import 'package:parlour_account/utils/money_amount.dart';
+
+const _weeklyChartAxisWidth = 40.0;
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,16 +28,19 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  Future<void> _open(Widget page) async {
-    await Navigator.of(context).push<void>(appRoute<void>(page));
-    if (mounted) await context.read<DashboardProvider>().load();
-  }
-
   Future<void> _refresh() => context.read<DashboardProvider>().load();
+
+  void _openProfile() {
+    Navigator.of(context).push(appRoute<void>(const ProfilePage()));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final today = DateTime.now();
+    final localizations = MaterialLocalizations.of(context);
+    final firstDay = today.subtract(const Duration(days: 6));
+    final dateRange = '${localizations.formatShortDate(firstDay)} – '
+        '${localizations.formatShortDate(today)}';
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -45,193 +49,273 @@ class _DashboardPageState extends State<DashboardPage> {
           slivers: [
             SliverAppBar(
               pinned: true,
-              title: const Text('Parlour dashboard'),
+              toolbarHeight: 68,
+              titleSpacing: 18,
+              title: const _BrandHeader(),
               actions: [
-                IconButton(
-                  tooltip: 'Profile and settings',
-                  icon: const Icon(Icons.account_circle_outlined),
-                  onPressed: () => _open(const ProfilePage()),
-                ),
-                const SizedBox(width: 8),
+                _ProfileButton(onPressed: _openProfile),
+                const SizedBox(width: 12),
               ],
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-              sliver: SliverList.list(children: [
-            Text('Today at a glance', style: textTheme.headlineSmall),
-            const SizedBox(height: 4),
-            Text(_todayLabel(), style: textTheme.bodyMedium),
-            const SizedBox(height: 18),
-            Consumer<DashboardProvider>(
-              builder: (context, dashboard, _) {
-                if (dashboard.isLoading && dashboard.trend.isEmpty) {
-                  return const SizedBox(
-                    height: 180,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (dashboard.error != null && dashboard.trend.isEmpty) {
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Text(dashboard.error!, textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: dashboard.load,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Try again'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                final totals = dashboard.totals;
-                return Column(
-                  children: [
-                    Row(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+              sliver: SliverToBoxAdapter(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Income',
-                            amount: totals.income,
-                            icon: Icons.south_west_rounded,
-                            color: AppTheme.slateBlue,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Last 7 days at a glance',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                            ),
+                            Consumer<DashboardProvider>(
+                              builder: (context, dashboard, _) => _LiveBadge(
+                                loading: dashboard.isLoading,
+                                error: dashboard.error != null,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Expenses',
-                            amount: totals.expenses,
-                            icon: Icons.north_east_rounded,
-                            color: AppTheme.graphite,
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              dateRange,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'Refresh dashboard',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _refresh,
+                              icon: const Icon(Icons.refresh_rounded, size: 20),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Consumer<DashboardProvider>(
+                          builder: (context, dashboard, _) {
+                            if (dashboard.error != null &&
+                                dashboard.trend.isEmpty) {
+                              return _DashboardError(
+                                message: dashboard.error!,
+                                onRetry: dashboard.load,
+                              );
+                            }
+                            if (dashboard.isLoading &&
+                                dashboard.trend.isEmpty) {
+                              return const _DashboardLoading();
+                            }
+                            return Column(
+                              children: [
+                                _MetricGrid(totals: dashboard.totals),
+                                const SizedBox(height: 12),
+                                _NetCashCard(totals: dashboard.totals),
+                                const SizedBox(height: 22),
+                                _WeeklyTrendCard(
+                                  points: dashboard.trend,
+                                  loading: dashboard.isLoading &&
+                                      dashboard.trend.isEmpty,
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Bills paid today',
-                            amount: totals.billsPaid,
-                            icon: Icons.receipt_long_outlined,
-                            color: AppTheme.slateBlue,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SummaryCard(
-                            label: 'Due / overdue',
-                            amount: totals.due,
-                            icon: Icons.account_balance_wallet_outlined,
-                            color: AppTheme.steel,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _SummaryCard(
-                      label: 'Net after payments today',
-                      amount: totals.net,
-                      icon: Icons.account_balance_wallet_outlined,
-                      color: AppTheme.midnight,
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: Text('Last 7 days', style: textTheme.titleLarge)),
-                Icon(Icons.insights_rounded,
-                    color: Theme.of(context).colorScheme.primary),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Consumer<DashboardProvider>(
-              builder: (context, dashboard, _) => _WeeklyTrendCard(
-                points: dashboard.trend,
-                loading: dashboard.isLoading && dashboard.trend.isEmpty,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text('Quick actions', style: textTheme.titleLarge),
-            const SizedBox(height: 10),
-            LayoutBuilder(builder: (context, constraints) {
-              final columns = constraints.maxWidth < 440 ? 1 : 2;
-              final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  SizedBox(width: width, child: _ActionTile(
-                    icon: Icons.add_circle_outline_rounded,
-                    title: 'Add daily income or expense',
-                    onTap: () => _open(const DailyDataEntryPage()),
-                  )),
-                  SizedBox(width: width, child: _ActionTile(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Add bill or payment',
-                    onTap: () => _open(const BillPaymentEntryPage()),
-                  )),
-                  SizedBox(width: width, child: _ActionTile(
-                    icon: Icons.bar_chart_rounded,
-                    title: 'Monthly analysis',
-                    onTap: () => _open(const MonthlyAnalysisPage()),
-                  )),
-                  SizedBox(width: width, child: _ActionTile(
-                    icon: Icons.people_outline_rounded,
-                    title: 'Customers and appointments',
-                    onTap: () => _open(const CustomerAppointmentPage()),
-                  )),
-                ],
-              );
-            }),
-              ]),
             ),
           ],
         ),
       ),
     );
   }
-
-  String _todayLabel() {
-    final date = DateTime.now();
-    return '${date.day} ${_monthName(date.month)} ${date.year}';
-  }
-
-  String _monthName(int month) => const [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ][month - 1];
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppTheme.mist,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.spa_outlined, color: AppTheme.slateBlue),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'OM BEAUTY PARLOUR',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      letterSpacing: .7,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              Text('Overview', style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+        ],
+      );
+}
+
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: 'Profile and settings',
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        icon: CircleAvatar(
+          radius: 18,
+          backgroundColor: AppTheme.mist,
+          foregroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
+          child: photoUrl == null
+              ? const Icon(Icons.person_outline_rounded,
+                  size: 20, color: AppTheme.slateBlue)
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge({required this.loading, required this.error});
+
+  final bool loading;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = error
+        ? Theme.of(context).colorScheme.error
+        : loading
+            ? AppTheme.steel
+            : AppTheme.slateBlue;
+    final label = error ? 'Offline' : loading ? 'Updating' : 'Live';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.totals});
+
+  final DashboardTotals totals;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 600 ? 4 : 2;
+          final gap = 10.0;
+          final width =
+              (constraints.maxWidth - gap * (columns - 1)) / columns;
+          final cards = [
+            _MetricCard(
+              label: 'INCOME',
+              amount: totals.income,
+              detail: 'Last 7 days',
+              icon: Icons.south_west_rounded,
+              color: AppTheme.slateBlue,
+            ),
+            _MetricCard(
+              label: 'EXPENSES',
+              amount: totals.expenses,
+              detail: 'Last 7 days',
+              icon: Icons.north_east_rounded,
+              color: AppTheme.rose,
+            ),
+            _MetricCard(
+              label: 'BILLS PAID · 7 DAYS',
+              amount: totals.billsPaid,
+              detail: 'Last 7 days',
+              icon: Icons.receipt_long_outlined,
+              color: AppTheme.slateBlue,
+            ),
+            _MetricCard(
+              label: 'DUE / OVERDUE',
+              amount: totals.due,
+              detail: 'Unpaid balance',
+              icon: Icons.account_balance_wallet_outlined,
+              color: AppTheme.rose,
+            ),
+          ];
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final card in cards) SizedBox(width: width, child: card),
+            ],
+          );
+        },
+      );
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
     required this.label,
     required this.amount,
+    required this.detail,
     required this.icon,
     required this.color,
   });
 
   final String label;
   final int amount;
+  final String detail;
   final IconData icon;
   final Color color;
 
@@ -240,49 +324,166 @@ class _SummaryCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: AppTheme.mist,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 20),
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, color: color, size: 16),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            Text(label, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 5),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+                letterSpacing: .25,
+              ),
+            ),
+            const SizedBox(height: 3),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, .12),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                ),
-                child: Text(
-                  '₹${MoneyAmount.formatPaise(amount)}',
-                  key: ValueKey(amount),
-                  style: theme.textTheme.titleMedium,
-                ),
+              child: Text(
+                _rupees(amount),
+                style: AppTheme.currencyStat.copyWith(fontSize: 21),
               ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              detail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _NetCashCard extends StatelessWidget {
+  const _NetCashCard({required this.totals});
+
+  final DashboardTotals totals;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final netColor = totals.net < 0 ? AppTheme.rose : const Color(0xFFA9F1DB);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.midnight,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x18121A26),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'NET CASH FLOW · LAST 7 DAYS',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: const Color(0xFFB9C1C8),
+                    letterSpacing: .7,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(Icons.account_balance_wallet_outlined,
+                    size: 19, color: Color(0xFFA9F1DB)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          AnimatedSwitcher(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            child: Text(
+              _rupees(totals.net),
+              key: ValueKey(totals.net),
+              style: AppTheme.currencyStat.copyWith(
+                fontSize: 29,
+                color: netColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0x332C3946), height: 1),
+          const SizedBox(height: 13),
+          Wrap(
+            spacing: 18,
+            runSpacing: 10,
+            children: [
+              _CashFlowLine(label: 'Income', amount: totals.income),
+              _CashFlowLine(label: 'Expenses', amount: -totals.expenses),
+              _CashFlowLine(label: 'Bill payments', amount: -totals.billsPaid),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CashFlowLine extends StatelessWidget {
+  const _CashFlowLine({required this.label, required this.amount});
+
+  final String label;
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 120,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFFB9C1C8),
+                    )),
+            const SizedBox(height: 2),
+            Text(
+              '${amount < 0 ? '−' : ''}${_rupees(amount.abs())}',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _WeeklyTrendCard extends StatelessWidget {
@@ -293,71 +494,111 @@ class _WeeklyTrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Card(
-        child: SizedBox(
-          height: 210,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-    if (points.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('No recent income or expense records yet.'),
-        ),
-      );
-    }
-
+    final theme = Theme.of(context);
+    final income = points.fold<int>(0, (sum, point) => sum + point.income);
+    final expenses = points.fold<int>(0, (sum, point) => sum + point.expenses);
+    final hasData = income > 0 || expenses > 0;
+    final averageIncome = points.isEmpty ? 0 : (income / points.length).round();
+    final net = income - expenses;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        padding: const EdgeInsets.fromLTRB(15, 14, 15, 13),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                _Legend(color: AppTheme.midnight, label: 'Income'),
-                SizedBox(width: 18),
-                _Legend(color: AppTheme.steel, label: 'Expenses'),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text('Last 7 days', style: theme.textTheme.titleMedium),
+                      const SizedBox(width: 7),
+                      Icon(Icons.trending_up_rounded,
+                          size: 18, color: theme.colorScheme.secondary),
+                    ],
+                  ),
+                ),
+                const _Legend(color: AppTheme.slateBlue, label: 'Income'),
+                const SizedBox(width: 12),
+                const _Legend(color: AppTheme.rose, label: 'Exp.'),
               ],
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 178,
-              width: double.infinity,
-              child: TweenAnimationBuilder<double>(
-                key: ValueKey(points
-                    .map((point) => '${point.income}:${point.expenses}')
-                    .join('|')),
-                tween: Tween(begin: 0, end: 1),
-                // duration: const Duration(milliseconds: 700),
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 700),
-                curve: Curves.easeOutCubic,
-                builder: (context, progress, _) => RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _WeeklyChartPainter(points, progress),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        for (final point in points)
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 148),
-                              child: Text(
-                                point.shortLabel,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.labelSmall,
+            const SizedBox(height: 8),
+            if (loading)
+              const SizedBox(
+                height: 142,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (!hasData)
+              SizedBox(
+                height: 142,
+                child: Center(
+                  child: Text(
+                    'Your daily activity will appear here.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 142,
+                width: double.infinity,
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey(points
+                      .map((point) => '${point.income}:${point.expenses}')
+                      .join('|')),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 420),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, progress, _) => RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _WeeklyChartPainter(points, progress),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Row(
+                          children: [
+                            const SizedBox(width: _weeklyChartAxisWidth),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  for (var i = 0; i < points.length; i++)
+                                    Expanded(
+                                      child: Text(
+                                        i == points.length - 1
+                                            ? 'Today'
+                                            : _weekday(points[i].date.weekday),
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(fontSize: 9),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                          ),
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _TrendSummary(
+                  label: 'Avg. daily income',
+                  value: _rupees(averageIncome),
+                ),
+                _TrendSummary(
+                  label: 'Income less daily expenses',
+                  value: _rupees(net),
+                  isNegative: net < 0,
+                ),
+              ],
             ),
           ],
         ),
@@ -367,7 +608,7 @@ class _WeeklyTrendCard extends StatelessWidget {
 }
 
 class _WeeklyChartPainter extends CustomPainter {
-  _WeeklyChartPainter(this.points, this.progress);
+  const _WeeklyChartPainter(this.points, this.progress);
 
   final List<DailyTrendPoint> points;
   final double progress;
@@ -375,28 +616,51 @@ class _WeeklyChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty) return;
-    const top = 8.0;
-    const bottom = 34.0;
+    const axisWidth = _weeklyChartAxisWidth;
+    const top = 12.0;
+    const bottom = 27.0;
     final chartHeight = size.height - top - bottom;
+    final gridPaint = Paint()
+      ..color = AppTheme.outline
+      ..strokeWidth = 1;
+    final plotWidth = size.width - axisWidth;
     final maxValue = points.fold<int>(0, (max, point) {
-      final value =
-          point.income > point.expenses ? point.income : point.expenses;
+      final value = point.income > point.expenses ? point.income : point.expenses;
       return value > max ? value : max;
     });
-    final paint = Paint()..strokeWidth = 1;
-    for (var i = 0; i < 4; i++) {
-      final y = top + chartHeight * i / 3;
-      paint.color = AppTheme.mist;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    for (var i = 0; i < 3; i++) {
+      final fraction = i / 2;
+      final y = top + chartHeight * fraction;
+      canvas.drawLine(Offset(axisWidth, y), Offset(size.width, y), gridPaint);
+      final value = (maxValue * (1 - fraction)).round();
+      final label = TextPainter(
+        text: TextSpan(
+          text: '\u20B9${value ~/ 100}',
+          style: const TextStyle(
+            color: AppTheme.steel,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: axisWidth - 4);
+      label.paint(
+        canvas,
+        Offset(axisWidth - label.width - 4, y - label.height / 2),
+      );
     }
-    final slot = size.width / points.length;
-    final barWidth = (slot * .22).clamp(4.0, 14.0);
+    if (maxValue == 0) return;
+    final slot = plotWidth / points.length;
+    final barWidth = (slot * .2).clamp(5.0, 15.0);
+    final barPaint = Paint();
     for (var i = 0; i < points.length; i++) {
-      final center = slot * (i + .5);
-      for (var series = 0; series < 2; series++) {
-        final value = series == 0 ? points[i].income : points[i].expenses;
-        if (maxValue == 0 || value == 0) continue;
-        final barHeight = chartHeight * value / maxValue * progress;
+      final center = axisWidth + slot * (i + .5);
+      final values = [points[i].income, points[i].expenses];
+      for (var series = 0; series < values.length; series++) {
+        if (values[series] == 0) continue;
+        final barHeight = chartHeight * values[series] / maxValue * progress;
+        barPaint.color = series == 0 ? AppTheme.slateBlue : AppTheme.rose;
         final rect = RRect.fromRectAndRadius(
           Rect.fromLTWH(
             center + (series == 0 ? -barWidth - 2 : 2),
@@ -404,10 +668,9 @@ class _WeeklyChartPainter extends CustomPainter {
             barWidth,
             barHeight,
           ),
-          const Radius.circular(5),
+          const Radius.circular(4),
         );
-        paint.color = series == 0 ? AppTheme.midnight : AppTheme.steel;
-        canvas.drawRRect(rect, paint);
+        canvas.drawRRect(rect, barPaint);
       }
     }
   }
@@ -428,40 +691,94 @@ class _Legend extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 9,
-            height: 9,
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 7),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(width: 5),
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
         ],
       );
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
+class _TrendSummary extends StatelessWidget {
+  const _TrendSummary({
+    required this.label,
+    required this.value,
+    this.isNegative = false,
   });
 
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
+  final String label;
+  final String value;
+  final bool isNegative;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Card(
-        child: ListTile(
-          minVerticalPadding: 13,
-          leading: Icon(icon, color: AppTheme.midnight),
-          title: Text(title),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: onTap,
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.mist,
+          borderRadius: BorderRadius.circular(10),
         ),
-      ),
-    );
-  }
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$label  ', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: isNegative ? Theme.of(context).colorScheme.error : null,
+                  ),
+            ),
+          ],
+        ),
+      );
 }
+
+class _DashboardLoading extends StatelessWidget {
+  const _DashboardLoading();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 280,
+        child: Center(child: CircularProgressIndicator()),
+      );
+}
+
+class _DashboardError extends StatelessWidget {
+  const _DashboardError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 28),
+              const SizedBox(height: 8),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+String _rupees(int paise) => '\u20B9${MoneyAmount.formatPaise(paise)}';
+
+String _weekday(int weekday) => const [
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ][weekday - 1];

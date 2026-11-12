@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/services/firebase/account_data.dart';
 import 'package:parlour_account/models/bill_payment_model.dart';
 import 'package:parlour_account/screens/bills/edit_bill_screen.dart';
@@ -124,7 +125,7 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
         title: const Text('Manage Bill Entry'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 12 : 20),
         child: Column(
           children: [
             // Month and Year Selection Form
@@ -180,79 +181,29 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
                           return const Center(child: Text('No data found'));
                         }
 
-                        // Scrollable DataTable
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(label: Text('Date')),
-                                DataColumn(label: Text('Payee')),
-                                DataColumn(label: Text('Bill Amount (Cash)')),
-                                DataColumn(label: Text('Bill Amount (Online)')),
-                                DataColumn(label: Text('Paid')),
-                                DataColumn(label: Text('Outstanding')),
-                                DataColumn(label: Text('Status')),
-                                DataColumn(label: Text('Due date')),
-                                DataColumn(label: Text('Description')),
-                                DataColumn(label: Text('Actions')),
-                              ],
-                              rows: documents.map((entry) {
-                                final data =
-                                    entry.data() as Map<String, dynamic>;
-                                final docId = entry.id;
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(data['date'] ?? 'N/A')),
-                                    DataCell(Text(data['payee'] ?? '—')),
-                                    DataCell(Text(MoneyAmount.formatStored(
-                                        data['billAmountCash']))),
-                                    DataCell(Text(MoneyAmount.formatStored(
-                                        data['billAmountOnline']))),
-                                    DataCell(Text(MoneyAmount.formatPaise(
-                                        BillPaymentModel.paidPaise(data)))),
-                                    DataCell(Text(MoneyAmount.formatPaise(
-                                        BillPaymentModel.outstandingPaise(
-                                            data)))),
-                                    DataCell(Text(BillPaymentModel.statusLabel(
-                                        data['paymentStatus'] as String? ??
-                                            'paid'))),
-                                    DataCell(Text(data['dueDate'] ?? '—')),
-                                    DataCell(Text(data['description'] ?? '')),
-                                    DataCell(
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      EditBillPage(
-                                                    docId: docId,
-                                                    entryData: data,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete),
-                                            onPressed: () {
-                                              _showDeleteConfirmationDialog(
-                                                  docId, data);
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
+                        return ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          itemCount: documents.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final entry = documents[index];
+                            final data = entry.data() as Map<String, dynamic>;
+                            return _BillRecordCard(
+                              data: data,
+                              onEdit: () => Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditBillPage(
+                                    docId: entry.id,
+                                    entryData: data,
+                                  ),
+                                ),
+                              ),
+                              onDelete: () =>
+                                  _showDeleteConfirmationDialog(entry.id, data),
+                            );
+                          },
                         );
                       },
                     )
@@ -266,6 +217,199 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BillRecordCard extends StatelessWidget {
+  const _BillRecordCard({
+    required this.data,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Map<String, dynamic> data;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = BillPaymentModel.statusLabel(
+      data['paymentStatus'] as String? ?? 'paid',
+    );
+    final payee = data['payee']?.toString().trim() ?? '';
+    final description = data['description']?.toString().trim() ?? '';
+    final dueDate = data['dueDate']?.toString() ?? '';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        payee.isEmpty ? 'Vendor not recorded' : payee,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        data['date']?.toString() ?? 'Date not recorded',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _BillStatusTag(status: status),
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: 'Edit bill',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Delete bill',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onDelete,
+                  color: theme.colorScheme.error,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ],
+            ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 7),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 10),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 16) / 3;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    SizedBox(
+                      width: width,
+                      child: _BillValue(
+                        label: 'Bill total',
+                        amount: BillPaymentModel.totalPaise(data),
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _BillValue(
+                        label: 'Paid',
+                        amount: BillPaymentModel.paidPaise(data),
+                      ),
+                    ),
+                    SizedBox(
+                      width: width,
+                      child: _BillValue(
+                        label: 'Outstanding',
+                        amount: BillPaymentModel.outstandingPaise(data),
+                        color: AppTheme.rose,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            if (dueDate.isNotEmpty) ...[
+              const SizedBox(height: 9),
+              Row(
+                children: [
+                  Icon(Icons.event_busy_outlined,
+                      size: 16, color: theme.colorScheme.secondary),
+                  const SizedBox(width: 6),
+                  Text('Due $dueDate', style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BillValue extends StatelessWidget {
+  const _BillValue({
+    required this.label,
+    required this.amount,
+    this.color,
+  });
+
+  final String label;
+  final int amount;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '\u20B9${MoneyAmount.formatPaise(amount)}',
+                style: AppTheme.currencyStat.copyWith(
+                  color: color,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _BillStatusTag extends StatelessWidget {
+  const _BillStatusTag({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPaid = status.toLowerCase() == 'paid';
+    final color = isPaid ? AppTheme.slateBlue : AppTheme.rose;
+    return Container(
+      margin: const EdgeInsets.only(top: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        status,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }
