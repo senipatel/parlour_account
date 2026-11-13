@@ -32,8 +32,14 @@ class FinancialReport {
     required this.startDate,
     required this.endDate,
     required this.incomePaise,
+    required this.incomeCashPaise,
+    required this.incomeOnlinePaise,
     required this.operatingExpensesPaise,
+    required this.expenseCashPaise,
+    required this.expenseOnlinePaise,
     required this.billInvoicesPaise,
+    required this.billCashPaise,
+    required this.billOnlinePaise,
     required this.billPaymentsPaise,
     required this.billOutstandingPaise,
     required this.categoryTotals,
@@ -50,20 +56,30 @@ class FinancialReport {
     bool wasLimited = false,
   }) {
     var income = 0;
+    var incomeCash = 0;
+    var incomeOnline = 0;
     var operatingExpenses = 0;
+    var expenseCash = 0;
+    var expenseOnline = 0;
     var invoices = 0;
+    var billCash = 0;
+    var billOnline = 0;
     var payments = 0;
     var outstanding = 0;
     final categories = <String, int>{};
     final lines = <ReportLine>[];
 
     for (final data in dailyRecords) {
-      final entryIncome =
-          (MoneyAmount.paiseFromStored(data['incomeCash']) ?? 0) +
-              (MoneyAmount.paiseFromStored(data['incomeOnline']) ?? 0);
-      final entryExpenses =
-          (MoneyAmount.paiseFromStored(data['expenseCash']) ?? 0) +
-              (MoneyAmount.paiseFromStored(data['expenseOnline']) ?? 0);
+      final entryIncomeCash =
+          MoneyAmount.paiseFromStored(data['incomeCash']) ?? 0;
+      final entryIncomeOnline =
+          MoneyAmount.paiseFromStored(data['incomeOnline']) ?? 0;
+      final entryExpenseCash =
+          MoneyAmount.paiseFromStored(data['expenseCash']) ?? 0;
+      final entryExpenseOnline =
+          MoneyAmount.paiseFromStored(data['expenseOnline']) ?? 0;
+      final entryIncome = entryIncomeCash + entryIncomeOnline;
+      final entryExpenses = entryExpenseCash + entryExpenseOnline;
       final date = data['date'] as String? ?? '';
       final description = data['description'] as String? ?? '';
       final incomeCategory =
@@ -71,7 +87,11 @@ class FinancialReport {
       final expenseCategory =
           data['expenseCategoryName'] as String? ?? 'Uncategorized';
       income += entryIncome;
+      incomeCash += entryIncomeCash;
+      incomeOnline += entryIncomeOnline;
       operatingExpenses += entryExpenses;
+      expenseCash += entryExpenseCash;
+      expenseOnline += entryExpenseOnline;
       if (entryIncome > 0) {
         final categoryKey = 'Income / $incomeCategory';
         categories[categoryKey] = (categories[categoryKey] ?? 0) + entryIncome;
@@ -101,6 +121,8 @@ class FinancialReport {
 
     for (final data in invoiceRecords) {
       final amount = BillPaymentModel.totalPaise(data);
+      billCash += BillPaymentModel.paidCashPaise(data);
+      billOnline += BillPaymentModel.paidOnlinePaise(data);
       final paidForInvoice = BillPaymentModel.paidPaise(data);
       final balance = BillPaymentModel.outstandingPaise(data);
       invoices += amount;
@@ -148,8 +170,14 @@ class FinancialReport {
       startDate: startDate,
       endDate: endDate,
       incomePaise: income,
+      incomeCashPaise: incomeCash,
+      incomeOnlinePaise: incomeOnline,
       operatingExpensesPaise: operatingExpenses,
+      expenseCashPaise: expenseCash,
+      expenseOnlinePaise: expenseOnline,
       billInvoicesPaise: invoices,
+      billCashPaise: billCash,
+      billOnlinePaise: billOnline,
       billPaymentsPaise: payments,
       billOutstandingPaise: outstanding,
       categoryTotals: Map.unmodifiable(categories),
@@ -161,8 +189,14 @@ class FinancialReport {
   final String startDate;
   final String endDate;
   final int incomePaise;
+  final int incomeCashPaise;
+  final int incomeOnlinePaise;
   final int operatingExpensesPaise;
+  final int expenseCashPaise;
+  final int expenseOnlinePaise;
   final int billInvoicesPaise;
+  final int billCashPaise;
+  final int billOnlinePaise;
   final int billPaymentsPaise;
   final int billOutstandingPaise;
   final Map<String, int> categoryTotals;

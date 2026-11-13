@@ -1,4 +1,4 @@
-package com.example.parlour_account
+package com.parlourpilot.app
 
 import io.flutter.embedding.android.FlutterActivity
 

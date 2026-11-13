@@ -10,7 +10,7 @@ class ParlourApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Parlour Account Management',
+      title: 'ParlourPilot',
       theme: AppTheme.light,
       themeAnimationDuration: const Duration(milliseconds: 280),
       themeAnimationCurve: Curves.easeInOutCubic,

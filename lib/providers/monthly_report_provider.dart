@@ -13,8 +13,8 @@ class MonthlyReportData {
     required this.incomeOnline,
     required this.expenseCash,
     required this.expenseOnline,
-    required this.billAmountCash,
-    required this.billAmountOnline,
+    required this.billPaidCash,
+    required this.billPaidOnline,
     required this.billPaid,
     required this.billOutstanding,
   });
@@ -25,8 +25,8 @@ class MonthlyReportData {
   final int incomeOnline;
   final int expenseCash;
   final int expenseOnline;
-  final int billAmountCash;
-  final int billAmountOnline;
+  final int billPaidCash;
+  final int billPaidOnline;
   final int billPaid;
   final int billOutstanding;
 
@@ -51,6 +51,9 @@ class MonthlyReportProvider extends ChangeNotifier {
   String? get error => _error;
 
   void selectPeriod(String? key) {
+    if (_selectedPeriodKey != key) {
+      _report = null;
+    }
     _selectedPeriodKey = key;
     notifyListeners();
   }
@@ -71,6 +74,7 @@ class MonthlyReportProvider extends ChangeNotifier {
       _periods = periods;
       if (!_periods.any((period) => period.key == _selectedPeriodKey)) {
         _selectedPeriodKey = periods.isEmpty ? null : periods.first.key;
+        _report = null;
       }
     } catch (_) {
       _error = 'Could not load report months. Check your connection.';
@@ -91,7 +95,6 @@ class MonthlyReportProvider extends ChangeNotifier {
     if (period == null) return;
     _loadingReport = true;
     _error = null;
-    _report = null;
     notifyListeners();
     try {
       final results = await Future.wait([
@@ -110,8 +113,8 @@ class MonthlyReportProvider extends ChangeNotifier {
       var incomeOnline = 0;
       var expenseCash = 0;
       var expenseOnline = 0;
-      var billAmountCash = 0;
-      var billAmountOnline = 0;
+      var billPaidCash = 0;
+      var billPaidOnline = 0;
       var billPaid = 0;
       var billOutstanding = 0;
       for (final data in dailyEntries) {
@@ -122,10 +125,8 @@ class MonthlyReportProvider extends ChangeNotifier {
             MoneyAmount.paiseFromStored(data['expenseOnline']) ?? 0;
       }
       for (final data in billEntries) {
-        billAmountCash +=
-            MoneyAmount.paiseFromStored(data['billAmountCash']) ?? 0;
-        billAmountOnline +=
-            MoneyAmount.paiseFromStored(data['billAmountOnline']) ?? 0;
+        billPaidCash += BillPaymentModel.paidCashPaise(data);
+        billPaidOnline += BillPaymentModel.paidOnlinePaise(data);
         billPaid += BillPaymentModel.paidPaise(data);
         billOutstanding += BillPaymentModel.outstandingPaise(data);
       }
@@ -136,8 +137,8 @@ class MonthlyReportProvider extends ChangeNotifier {
         incomeOnline: incomeOnline,
         expenseCash: expenseCash,
         expenseOnline: expenseOnline,
-        billAmountCash: billAmountCash,
-        billAmountOnline: billAmountOnline,
+        billPaidCash: billPaidCash,
+        billPaidOnline: billPaidOnline,
         billPaid: billPaid,
         billOutstanding: billOutstanding,
       );

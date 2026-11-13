@@ -29,7 +29,7 @@ if (hasPartialReleaseSigning && !hasReleaseSigning) {
 }
 
 android {
-    namespace = "com.example.parlour_account"
+    namespace = "com.parlourpilot.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         // Specify your unique application ID
-        applicationId = "com.example.parlour_account"
+        applicationId = "com.parlourpilot.app"
 
         // Use the Flutter-specific versions
         minSdkVersion flutter.minSdkVersion   // Set this to 23 as per Firebase requirement

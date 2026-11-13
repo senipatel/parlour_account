@@ -13,7 +13,6 @@ class DailyDataEntryPage extends StatefulWidget {
   @override
   State<DailyDataEntryPage> createState() => _DailyDataEntryPageState();
 }
-
 class _DailyDataEntryPageState extends State<DailyDataEntryPage> {
   final _formKey = GlobalKey<FormState>();
   final _incomeCashController = TextEditingController();
@@ -92,43 +91,9 @@ class _DailyDataEntryPageState extends State<DailyDataEntryPage> {
       'date': _dateKey(_selectedDate!),
       'timestamp': Timestamp.now(),
     };
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Review daily entry'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _PreviewLine('Income · cash', _incomeCashController.text),
-            _PreviewLine('Income · online', _incomeOnlineController.text),
-            _PreviewLine('Expenses · cash', _expenseCashController.text),
-            _PreviewLine('Expenses · online', _expenseOnlineController.text),
-            _PreviewLine('Date', _dateController.text),
-            if (_descriptionController.text.trim().isNotEmpty)
-              _PreviewLine('Note', _descriptionController.text.trim()),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Edit'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save entry'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
     try {
       await context.read<DailyEntryProvider>().save(data);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Daily entry saved.')));
       Navigator.of(context).pop();
     } catch (_) {
       if (!mounted) return;
@@ -324,7 +289,7 @@ class _DailyDataEntryPageState extends State<DailyDataEntryPage> {
                         : const Icon(Icons.check_rounded,
                             key: ValueKey('ready')),
                   ),
-                  label: Text(provider.isSaving ? 'Saving…' : 'Review & save'),
+                  label: Text(provider.isSaving ? 'Saving…' : 'Save entry'),
                 ),
               ),
             ),
@@ -335,28 +300,3 @@ class _DailyDataEntryPageState extends State<DailyDataEntryPage> {
   }
 }
 
-class _PreviewLine extends StatelessWidget {
-  const _PreviewLine(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 9),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Text(value.isEmpty ? '0' : value,
-                  textAlign: TextAlign.end,
-                  style: Theme.of(context).textTheme.titleMedium),
-            ),
-          ],
-        ),
-      );
-}

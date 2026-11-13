@@ -49,7 +49,7 @@ class _DashboardPageState extends State<DashboardPage> {
           slivers: [
             SliverAppBar(
               pinned: true,
-              toolbarHeight: 68,
+              // toolbarHeight: 68,
               titleSpacing: 18,
               title: const _BrandHeader(),
               actions: [
@@ -58,7 +58,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ],
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
               sliver: SliverToBoxAdapter(
                 child: Center(
                   child: ConstrainedBox(
@@ -82,7 +82,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        // const SizedBox(height: 8),
                         Row(
                           children: [
                             Icon(
@@ -439,9 +439,9 @@ class _NetCashCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
           const Divider(color: Color(0x332C3946), height: 1),
-          const SizedBox(height: 13),
+          const SizedBox(height: 4),
           Wrap(
             spacing: 18,
             runSpacing: 10,

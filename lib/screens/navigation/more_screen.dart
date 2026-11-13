@@ -117,7 +117,7 @@ class _MenuSection extends StatelessWidget {
             child: Column(children: [
               for (var i = 0; i < children.length; i++) ...[
                 children[i],
-                if (i != children.length - 1) const Divider(indent: 56),
+                if (i != children.length - 1) const Divider(indent: 18,endIndent: 18, height: 2,thickness: 2,),
               ],
             ]),
           ),

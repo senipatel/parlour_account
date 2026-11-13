@@ -122,7 +122,7 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Parlour Account',
+                      'ParlourPilot',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,

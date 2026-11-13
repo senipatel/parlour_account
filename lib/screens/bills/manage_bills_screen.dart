@@ -58,35 +58,26 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
       String docId, Map<String, dynamic> entryData) async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Deletion'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Date: ${entryData['date']}'),
-            Text('Payee: ${entryData['payee'] ?? 'Not recorded'}'),
-            Text(
-                'Bill amount (Cash): ₹${MoneyAmount.formatStored(entryData['billAmountCash'])}'),
-            Text(
-                'Bill amount (Online): ₹${MoneyAmount.formatStored(entryData['billAmountOnline'])}'),
-            Text('Description: ${entryData['description']}'),
-            Text(
-                'Status: ${BillPaymentModel.statusLabel(entryData['paymentStatus'] as String? ?? 'paid')}'),
-            Text(
-                'Outstanding: ₹${MoneyAmount.formatPaise(BillPaymentModel.outstandingPaise(entryData))}'),
-          ],
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        icon: Icon(Icons.delete_outline_rounded,
+            color: Theme.of(dialogContext).colorScheme.error),
+        title: const Text('Delete bill entry?'),
+        content: Text(
+          'Delete the bill for ${entryData['payee'] ?? 'this vendor'} dated ${entryData['date']}?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _deleteData(docId);
             },
-            child: const Text('Delete'),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(dialogContext).colorScheme.error)),
           ),
         ],
       ),
@@ -98,22 +89,25 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
     try {
       await AccountData.collection('BillPaymentEntry').doc(docId).delete();
 
-      // Show success confirmation
-      showDialog(
+    } catch (e) {
+      print("Error deleting data: $e");
+      if (!mounted) return;
+      showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Success'),
-          content: const Text('Data deleted successfully!'),
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          icon: Icon(Icons.error_outline_rounded,
+              color: Theme.of(dialogContext).colorScheme.error),
+          title: const Text('Could not delete bill'),
+          content: const Text('Please try again in a moment.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
             ),
           ],
         ),
       );
-    } catch (e) {
-      print("Error deleting data: $e");
     }
   }
 
@@ -299,7 +293,7 @@ class _BillRecordCard extends StatelessWidget {
             const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
-                final width = (constraints.maxWidth - 16) / 3;
+                final width = (constraints.maxWidth - 8) / 2;
                 return Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -316,14 +310,6 @@ class _BillRecordCard extends StatelessWidget {
                       child: _BillValue(
                         label: 'Paid',
                         amount: BillPaymentModel.paidPaise(data),
-                      ),
-                    ),
-                    SizedBox(
-                      width: width,
-                      child: _BillValue(
-                        label: 'Outstanding',
-                        amount: BillPaymentModel.outstandingPaise(data),
-                        color: AppTheme.rose,
                       ),
                     ),
                   ],

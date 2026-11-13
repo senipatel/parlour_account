@@ -57,8 +57,11 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
       String docId, Map<String, dynamic> entryData) async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Deletion'),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        icon: Icon(Icons.delete_outline_rounded,
+            color: Theme.of(dialogContext).colorScheme.error),
+        title: const Text('Delete daily entry?'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -83,10 +86,11 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close the dialog
+              Navigator.pop(dialogContext);
               _deleteData(docId); // Delete the data if confirmed
             },
-            child: const Text('Delete'),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(dialogContext).colorScheme.error)),
           ),
         ],
       ),
@@ -98,32 +102,21 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
     try {
       await AccountData.collection('DailyDataEntry').doc(docId).delete();
 
-      // Show success confirmation
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Success'),
-          content: const Text('Data deleted successfully!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
     } catch (e) {
       print("Error deleting data: $e");
-      // Show failure confirmation
+      if (!mounted) return;
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Error'),
-          content: const Text('Failed to delete the data. Please try again.'),
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          icon: Icon(Icons.error_outline_rounded,
+              color: Theme.of(dialogContext).colorScheme.error),
+          title: const Text('Could not delete entry'),
+          content: const Text('Please try again in a moment.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
             ),
           ],
         ),
@@ -164,17 +157,17 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {});
-                    },
-                    child: const Text('Submit'),
-                  ),
+                  // const SizedBox(height: 20),
+                  // ElevatedButton(
+                  //   onPressed: () {
+                  //     setState(() {});
+                  //   },
+                  //   child: const Text('Submit'),
+                  // ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
 
             // Real-time data stream (conditionally rendered)
             Expanded(
@@ -302,7 +295,7 @@ class _DailyEntryRecordCard extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = (constraints.maxWidth - 8) / 2;

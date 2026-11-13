@@ -1,3 +1,4 @@
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,7 @@ import 'package:parlour_account/screens/bills/bill_payment_entry_screen.dart';
 import 'package:parlour_account/screens/customers/customer_appointment_screen.dart';
 import 'package:parlour_account/screens/daily_entry/daily_entry_screen.dart';
 import 'package:parlour_account/screens/profile/profile_screen.dart';
-import 'package:parlour_account/screens/reports/monthly_analysis_screen.dart';
+// import 'package:parlour_account/screens/reports/monthly_analysis_screen.dart';
 import 'package:parlour_account/utils/app_navigation.dart';
 import 'package:parlour_account/utils/money_amount.dart';
 
@@ -21,6 +22,10 @@ class EntriesPage extends StatelessWidget {
     Navigator.of(context).push(appRoute<void>(page));
   }
 
+  // void _openProfile() {
+  //   Navigator.of(context).push(appRoute<void>(const ProfilePage()));
+  // }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,15 +34,13 @@ class EntriesPage extends StatelessWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            toolbarHeight: 68,
+            // toolbarHeight: 68,
             titleSpacing: 18,
             title: const _EntriesHeader(),
             actions: [
-              IconButton(
-                tooltip: 'Profile and settings',
-                onPressed: () => _open(context, const ProfilePage()),
-                icon: const Icon(Icons.account_circle_outlined),
-              ),
+              _ProfileButton(onPressed: () {
+                _open(context, const ProfilePage());
+              }),
               const SizedBox(width: 8),
             ],
           ),
@@ -62,9 +65,8 @@ class EntriesPage extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   'Last 7 days',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall,
+                                  style:
+                                      Theme.of(context).textTheme.headlineSmall,
                                 ),
                               ),
                               if (dashboard.isLoading)
@@ -144,8 +146,8 @@ class EntriesPage extends StatelessWidget {
                             color: AppTheme.steel,
                             title: 'Customers & appointments',
                             subtitle: 'Client history and upcoming bookings',
-                            onTap: () => _open(
-                                context, const CustomerAppointmentPage()),
+                            onTap: () =>
+                                _open(context, const CustomerAppointmentPage()),
                           ),
                         ],
                       );
@@ -421,7 +423,8 @@ class _EntryTrendPainter extends CustomPainter {
     final chartHeight = size.height - top - bottom;
     final plotWidth = size.width - axisWidth;
     final maxValue = points.fold<int>(0, (max, point) {
-      final value = point.income > point.expenses ? point.income : point.expenses;
+      final value =
+          point.income > point.expenses ? point.income : point.expenses;
       return value > max ? value : max;
     });
     final grid = Paint()
@@ -516,6 +519,35 @@ class _QuickAction extends StatelessWidget {
           onTap: onTap,
         ),
       );
+}
+
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: 'Profile and settings',
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        icon: CircleAvatar(
+          radius: 18,
+          backgroundColor: AppTheme.mist,
+          foregroundImage: photoUrl == null ? null : NetworkImage(photoUrl),
+          child: photoUrl == null
+              ? const Icon(Icons.person_outline_rounded,
+                  size: 20, color: AppTheme.slateBlue)
+              : null,
+        ),
+      ),
+    );
+  }
 }
 
 String _rupees(int paise) => '\u20B9${MoneyAmount.formatPaise(paise)}';

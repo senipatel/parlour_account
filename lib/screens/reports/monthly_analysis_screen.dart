@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +5,7 @@ import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/models/bill_payment_model.dart';
 import 'package:parlour_account/providers/monthly_report_provider.dart';
 import 'package:parlour_account/utils/money_amount.dart';
+import 'package:parlour_account/utils/widgets/monthly_cash_flow_chart.dart';
 
 class MonthlyAnalysisPage extends StatefulWidget {
   const MonthlyAnalysisPage({super.key});
@@ -48,14 +47,14 @@ class _MonthlyAnalysisPageState extends State<MonthlyAnalysisPage> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
           title: const Text('Monthly report'),
-          actions: [
-            IconButton(
-              tooltip: 'Refresh report',
-              onPressed: _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-            const SizedBox(width: 8),
-          ],
+          // actions: [
+          //   // IconButton(
+          //   //   tooltip: 'Refresh report',
+          //   //   onPressed: _refresh,
+          //   //   icon: const Icon(Icons.refresh_rounded),
+          //   // ),
+          //   // const SizedBox(width: 8),
+          // ],
         ),
         body: Consumer<MonthlyReportProvider>(
           builder: (context, provider, _) {
@@ -193,182 +192,16 @@ class _MonthlyDonutCard extends StatelessWidget {
   final MonthlyReportData report;
 
   @override
-  Widget build(BuildContext context) {
-    final slices = <_Slice>[
-      _Slice('Income', report.income, AppTheme.slateBlue),
-      _Slice('Daily expenses', report.dailyExpenses, AppTheme.rose),
-      _Slice('Bill payments', report.billPaid, AppTheme.midnight),
-    ];
-    final total = slices.fold<int>(0, (sum, slice) => sum + slice.value);
-    final netMargin = report.income == 0
-        ? 0.0
-        : report.net / report.income * 100;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Cash flow',
-                      style: Theme.of(context).textTheme.titleLarge),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: report.net >= 0
-                        ? AppTheme.slateBlue.withValues(alpha: .12)
-                        : Theme.of(context)
-                            .colorScheme
-                            .error
-                            .withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    report.net >= 0 ? 'Positive cash flow' : 'Cash deficit',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: report.net >= 0
-                              ? AppTheme.slateBlue
-                              : Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text('Income, daily expenses, and bills paid',
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 222,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 650),
-                curve: Curves.easeOutCubic,
-                builder: (context, progress, _) => Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: const Size(206, 206),
-                      painter: _DonutPainter(slices, total, progress),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('NET AFTER OUTFLOWS',
-                            style: Theme.of(context).textTheme.labelSmall),
-                        const SizedBox(height: 4),
-                        FittedBox(
-                          child: Text(
-                            '₹${MoneyAmount.formatPaise(report.net)}',
-                            style: AppTheme.currencyStat.copyWith(
-                              color: AppTheme.slateBlue,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${netMargin >= 0 ? '+' : ''}${netMargin.toStringAsFixed(1)}% of income',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            for (final slice in slices)
-              _SliceLegend(
-                slice: slice,
-                percent: total == 0 ? 0 : slice.value / total * 100,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Slice {
-  const _Slice(this.label, this.value, this.color);
-
-  final String label;
-  final int value;
-  final Color color;
-}
-
-class _DonutPainter extends CustomPainter {
-  _DonutPainter(this.slices, this.total, this.progress);
-
-  final List<_Slice> slices;
-  final int total;
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 7;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final track = Paint()
-      ..color = AppTheme.mist
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 25;
-    canvas.drawCircle(center, radius, track);
-    if (total <= 0) return;
-
-    var start = -math.pi / 2;
-    for (final slice in slices) {
-      if (slice.value <= 0) continue;
-      final sweep = 2 * math.pi * slice.value / total * progress;
-      final paint = Paint()
-        ..color = slice.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 25
-        ..strokeCap = StrokeCap.round;
-      canvas.drawArc(rect, start, sweep, false, paint);
-      start += 2 * math.pi * slice.value / total * progress;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.total != total || oldDelegate.progress != progress;
-}
-
-class _SliceLegend extends StatelessWidget {
-  const _SliceLegend({required this.slice, required this.percent});
-
-  final _Slice slice;
-  final double percent;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration:
-                  BoxDecoration(color: slice.color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 9),
-            Expanded(child: Text(slice.label)),
-            Text('${percent.toStringAsFixed(0)}%',
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(width: 12),
-            Text('₹${MoneyAmount.formatPaise(slice.value)}',
-                style: AppTheme.currencyStat.copyWith(fontSize: 16)),
-          ],
-        ),
+  Widget build(BuildContext context) => MonthlyCashFlowChart(
+        incomeCash: report.incomeCash,
+        incomeOnline: report.incomeOnline,
+        expenseCash: report.expenseCash,
+        expenseOnline: report.expenseOnline,
+        billCash: report.billPaidCash,
+        billOnline: report.billPaidOnline,
+        net: report.net,
       );
 }
-
 class _TotalsGrid extends StatelessWidget {
   const _TotalsGrid({required this.report});
 
@@ -526,12 +359,7 @@ class _BillRecords extends StatelessWidget {
                         DataCell(Text(data['date']?.toString() ?? '—')),
                         DataCell(Text(data['payee']?.toString() ?? '—')),
                         DataCell(Text('₹${MoneyAmount.formatPaise(
-                          (MoneyAmount.paiseFromStored(
-                                      data['billAmountCash']) ??
-                                  0) +
-                              (MoneyAmount.paiseFromStored(
-                                      data['billAmountOnline']) ??
-                                  0),
+                          BillPaymentModel.totalPaise(data),
                         )}')),
                         DataCell(Text(BillPaymentModel.statusLabel(
                             data['paymentStatus'] as String? ?? 'paid'))),

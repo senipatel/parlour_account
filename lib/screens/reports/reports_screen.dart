@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -7,6 +6,7 @@ import 'package:parlour_account/models/financial_report.dart';
 import 'package:parlour_account/services/reports/financial_report_service.dart';
 import 'package:parlour_account/utils/money_amount.dart';
 import 'package:parlour_account/services/reports/report_export_service.dart';
+import 'package:parlour_account/utils/widgets/monthly_cash_flow_chart.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -94,77 +94,88 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Month analysis report')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+    return SafeArea(
+      child: Scaffold(
+        appBar: AppBar(
+          titleSpacing: 18,
+          centerTitle: false,
+          title: Column(
             children: [
               Text('Monthly cash flow',
                   style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text('Choose a date range to update the report.',
-                  style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _chooseStartDate,
-                      icon: const Icon(Icons.calendar_month),
-                      label: Text(
-                        'From\n${_dateText(_startDate)}',
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _chooseEndDate,
-                      icon: const Icon(Icons.event),
-                      label: Text(
-                        'To\n${_dateText(_endDate)}',
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              FutureBuilder<FinancialReport>(
-                future: _reportFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            const Text('Could not load this report.'),
-                            TextButton(
-                              onPressed: _runReport,
-                              child: const Text('Try again'),
-                            ),
-                          ],
+            ],
+          ),
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+              children: [
+                // Text('Monthly cash flow',
+                //     style: Theme.of(context).textTheme.headlineSmall),
+                // const SizedBox(height: 4),
+                // Text('Choose a date range to update the report.',
+                //     style: Theme.of(context).textTheme.bodyMedium),
+                // const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _chooseStartDate,
+                        icon: const Icon(Icons.calendar_month),
+                        label: Text(
+                          'From\n${_dateText(_startDate)}',
+                          textAlign: TextAlign.left,
                         ),
                       ),
-                    );
-                  }
-                  final report = snapshot.data;
-                  if (report == null) return const SizedBox.shrink();
-                  return _buildReport(report);
-                },
-              ),
-            ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _chooseEndDate,
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          'To\n${_dateText(_endDate)}',
+                          textAlign: TextAlign.left,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<FinancialReport>(
+                  future: _reportFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              const Text('Could not load this report.'),
+                              TextButton(
+                                onPressed: _runReport,
+                                child: const Text('Try again'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    final report = snapshot.data;
+                    if (report == null) return const SizedBox.shrink();
+                    return _buildReport(report);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -399,194 +410,16 @@ class _CashFlowCard extends StatelessWidget {
   final FinancialReport report;
 
   @override
-  Widget build(BuildContext context) {
-    final slices = [
-      _CashFlowSlice('Income & services', report.incomePaise, AppTheme.midnight),
-      _CashFlowSlice('Daily salon expenses', report.operatingExpensesPaise,
-          AppTheme.slateBlue),
-      _CashFlowSlice('Vendor bills paid', report.billPaymentsPaise, AppTheme.rose),
-    ];
-    final total = slices.fold<int>(0, (sum, slice) => sum + slice.amount);
-    final margin = report.incomePaise == 0
-        ? 0.0
-        : report.cashNetPaise / report.incomePaise * 100;
-    final positive = report.cashNetPaise >= 0;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Cash flow',
-                      style: Theme.of(context).textTheme.titleLarge),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (positive
-                            ? AppTheme.slateBlue
-                            : Theme.of(context).colorScheme.error)
-                        .withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    positive ? 'Balanced' : 'Deficit',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: positive
-                              ? AppTheme.slateBlue
-                              : Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text('Income, operating costs, and bills paid',
-                style: Theme.of(context).textTheme.bodySmall),
-            SizedBox(
-              width: double.infinity,
-              height: 218,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CustomPaint(
-                    size: const Size(202, 202),
-                    painter: _CashFlowDonutPainter(slices, total),
-                  ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('NET PROFIT',
-                          style: Theme.of(context).textTheme.labelSmall),
-                      const SizedBox(height: 4),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          _rupees(report.cashNetPaise),
-                          style: AppTheme.currencyStat.copyWith(fontSize: 24),
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${margin >= 0 ? '+' : ''}${margin.toStringAsFixed(1)}% net margin',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                              color: positive
-                                  ? AppTheme.slateBlue
-                                  : Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            for (final slice in slices)
-              _CashFlowLegend(
-                slice: slice,
-                percent: total == 0 ? 0 : slice.amount / total * 100,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CashFlowSlice {
-  const _CashFlowSlice(this.label, this.amount, this.color);
-
-  final String label;
-  final int amount;
-  final Color color;
-}
-
-class _CashFlowDonutPainter extends CustomPainter {
-  const _CashFlowDonutPainter(this.slices, this.total);
-
-  final List<_CashFlowSlice> slices;
-  final int total;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 8;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final track = Paint()
-      ..color = AppTheme.mist
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 23;
-    canvas.drawCircle(center, radius, track);
-    if (total <= 0) return;
-
-    var start = -math.pi / 2;
-    for (final slice in slices) {
-      if (slice.amount <= 0) continue;
-      final sweep = 2 * math.pi * slice.amount / total;
-      final paint = Paint()
-        ..color = slice.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 23
-        ..strokeCap = StrokeCap.round;
-      canvas.drawArc(rect, start, sweep, false, paint);
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CashFlowDonutPainter oldDelegate) =>
-      oldDelegate.total != total || oldDelegate.slices != slices;
-}
-
-class _CashFlowLegend extends StatelessWidget {
-  const _CashFlowLegend({required this.slice, required this.percent});
-
-  final _CashFlowSlice slice;
-  final double percent;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                  color: slice.color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 9),
-            Expanded(child: Text(slice.label)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: slice.color.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${percent.toStringAsFixed(0)}%',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: slice.color,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(_rupees(slice.amount),
-                style: AppTheme.currencyStat.copyWith(fontSize: 15)),
-          ],
-        ),
+  Widget build(BuildContext context) => MonthlyCashFlowChart(
+        incomeCash: report.incomeCashPaise,
+        incomeOnline: report.incomeOnlinePaise,
+        expenseCash: report.expenseCashPaise,
+        expenseOnline: report.expenseOnlinePaise,
+        billCash: report.billCashPaise,
+        billOnline: report.billOnlinePaise,
+        net: report.cashNetPaise,
       );
 }
-
 class _ReportMetricGrid extends StatelessWidget {
   const _ReportMetricGrid({required this.report});
 

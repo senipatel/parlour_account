@@ -72,55 +72,30 @@ class EditDailyDataPageState extends State<EditDailyDataPage> {
             .doc(widget.docId)
             .update(updatedData);
 
-        // Show success dialog
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Success'),
-            content: const Text('Data updated successfully!'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context); // Go back to previous page
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        if (mounted) Navigator.pop(context);
       } catch (e) {
         print("Error updating data: $e");
         // Show error dialog if update fails
+        if (!mounted) return;
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
+          builder: (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            icon: Icon(Icons.error_outline_rounded,
+                color: Theme.of(dialogContext).colorScheme.error),
+            title: const Text('Could not update entry'),
             content: const Text('Failed to update the data. Please try again.'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
               ),
             ],
           ),
         );
       }
     } else {
-      // If no changes were made, show error popup
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Changes'),
-          content: const Text('No changes were made to the data.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      Navigator.pop(context);
     }
   }
 

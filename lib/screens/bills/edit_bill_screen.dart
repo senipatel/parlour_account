@@ -1,8 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:parlour_account/services/firebase/account_data.dart';
 import 'package:parlour_account/models/bill_payment_model.dart';
-import 'package:parlour_account/utils/widgets/category_select_field.dart';
 import 'package:parlour_account/utils/money_amount.dart';
+import 'package:parlour_account/utils/widgets/entry_form_widgets.dart';
 
 class EditBillPage extends StatefulWidget {
   final Map<String, dynamic> entryData;
@@ -21,26 +22,20 @@ class EditBillPage extends StatefulWidget {
 class EditBillPageState extends State<EditBillPage> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _cashAmountController;
-  late TextEditingController _onlineAmountController;
+  late TextEditingController _billTotalController;
   late TextEditingController _paidCashController;
   late TextEditingController _paidOnlineController;
   late TextEditingController _payeeController;
   late TextEditingController _descriptionController;
   late TextEditingController _dateController;
-  late TextEditingController _dueDateController;
-  late TextEditingController _paidDateController;
-  String? _expenseCategoryId;
-  String? _expenseCategoryName;
 
   @override
   void initState() {
     super.initState();
     _dateController = TextEditingController(text: widget.entryData['date']);
-    _cashAmountController = TextEditingController(
-        text: MoneyAmount.formatStored(widget.entryData['billAmountCash']));
-    _onlineAmountController = TextEditingController(
-        text: MoneyAmount.formatStored(widget.entryData['billAmountOnline']));
+    _billTotalController = TextEditingController(
+      text: MoneyAmount.formatPaise(BillPaymentModel.totalPaise(widget.entryData)),
+    );
     final legacyRecord = !widget.entryData.containsKey('paidAmountCash') &&
         !widget.entryData.containsKey('paidAmountOnline');
     _paidCashController = TextEditingController(
@@ -58,35 +53,22 @@ class EditBillPageState extends State<EditBillPage> {
     );
     _descriptionController =
         TextEditingController(text: widget.entryData['description']);
-    _dueDateController = TextEditingController(
-      text: widget.entryData['dueDate'] as String? ?? '',
-    );
-    _paidDateController = TextEditingController(
-      text: widget.entryData['paidDate'] as String? ??
-          (legacyRecord ? widget.entryData['date'] as String? ?? '' : ''),
-    );
-    _expenseCategoryId = widget.entryData['expenseCategoryId'] as String?;
-    _expenseCategoryName = widget.entryData['expenseCategoryName'] as String?;
   }
 
   @override
   void dispose() {
     _dateController.dispose();
-    _cashAmountController.dispose();
-    _onlineAmountController.dispose();
+    _billTotalController.dispose();
     _paidCashController.dispose();
     _paidOnlineController.dispose();
     _payeeController.dispose();
     _descriptionController.dispose();
-    _dueDateController.dispose();
-    _paidDateController.dispose();
     super.dispose();
   }
 
   // Function to update data in Firestore
   Future<void> _updateData() async {
-    final total = _amount(_cashAmountController.text) +
-        _amount(_onlineAmountController.text);
+    final total = _amount(_billTotalController.text);
     final paid =
         _amount(_paidCashController.text) + _amount(_paidOnlineController.text);
     if (total <= 0 || paid > total) {
@@ -95,29 +77,20 @@ class EditBillPageState extends State<EditBillPage> {
           : 'Paid amount cannot be more than the bill total.');
       return;
     }
-    if (paid < total && _dueDateController.text.isEmpty) {
-      _message('Choose a due date for the remaining balance.');
-      return;
-    }
     final updatedData = {
       'date': _dateController.text,
       'payee': _payeeController.text.trim(),
-      'billAmountCash': MoneyAmount.rupeesToPaise(_cashAmountController.text)!,
-      'billAmountOnline':
-          MoneyAmount.rupeesToPaise(_onlineAmountController.text)!,
+      'billTotal': MoneyAmount.rupeesToPaise(_billTotalController.text)!,
       'paidAmountCash': MoneyAmount.rupeesToPaise(_paidCashController.text)!,
       'paidAmountOnline':
           MoneyAmount.rupeesToPaise(_paidOnlineController.text)!,
       'paymentStatus': BillPaymentModel.statusFor(total, paid),
-      'dueDate':
-          _dueDateController.text.isEmpty ? null : _dueDateController.text,
-      'paidDate': paid == 0
-          ? null
-          : (_paidDateController.text.isEmpty
-              ? _dateText(DateTime.now())
-              : _paidDateController.text),
-      'expenseCategoryId': _expenseCategoryId,
-      'expenseCategoryName': _expenseCategoryName,
+      'paidDate': paid > 0 ? _dateController.text : FieldValue.delete(),
+      'billAmountCash': FieldValue.delete(),
+      'billAmountOnline': FieldValue.delete(),
+      'dueDate': FieldValue.delete(),
+      'expenseCategoryId': FieldValue.delete(),
+      'expenseCategoryName': FieldValue.delete(),
       'description': _descriptionController.text,
     };
 
@@ -128,53 +101,29 @@ class EditBillPageState extends State<EditBillPage> {
             .doc(widget.docId)
             .update(updatedData);
 
-        // Show success dialog
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Success'),
-            content: const Text('Data updated successfully!'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context); // Go back to previous page
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        if (mounted) Navigator.pop(context);
       } catch (e) {
         print("Error updating data: $e");
+        if (!mounted) return;
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
+          builder: (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            icon: Icon(Icons.error_outline_rounded,
+                color: Theme.of(dialogContext).colorScheme.error),
+            title: const Text('Could not update bill'),
             content: const Text('Failed to update the data. Please try again.'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
               ),
             ],
           ),
         );
       }
     } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Changes'),
-          content: const Text('No changes were made to the data.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+      Navigator.pop(context);
     }
   }
 
@@ -189,31 +138,10 @@ class EditBillPageState extends State<EditBillPage> {
 
     if (selectedDate != null) {
       setState(() {
-        _dateController.text = "${selectedDate.toLocal()}".split(' ')[0];
+        _dateController.text = _dateText(selectedDate);
       });
     }
   }
-
-  Future<void> _selectDueDate() async {
-    final picked = await _pickDate(_dueDateController.text);
-    if (picked != null) {
-      setState(() => _dueDateController.text = _dateText(picked));
-    }
-  }
-
-  Future<void> _selectPaidDate() async {
-    final picked = await _pickDate(_paidDateController.text);
-    if (picked != null) {
-      setState(() => _paidDateController.text = _dateText(picked));
-    }
-  }
-
-  Future<DateTime?> _pickDate(String current) => showDatePicker(
-        context: context,
-        initialDate: DateTime.tryParse(current) ?? DateTime.now(),
-        firstDate: DateTime(2000),
-        lastDate: DateTime(2101),
-      );
 
   int _amount(String text) => MoneyAmount.rupeesToPaise(text) ?? 0;
 
@@ -226,159 +154,156 @@ class EditBillPageState extends State<EditBillPage> {
       ..showSnackBar(SnackBar(content: Text(text)));
   }
 
+  Widget _responsivePair(Widget first, Widget second) => LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 440) {
+            return Column(
+              children: [first, const SizedBox(height: 12), second],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: first),
+              const SizedBox(width: 10),
+              Expanded(child: second),
+            ],
+          );
+        },
+      );
+
   @override
   Widget build(BuildContext context) {
-    final currentTotal = _amount(_cashAmountController.text) +
-        _amount(_onlineAmountController.text);
+    final currentTotal = _amount(_billTotalController.text);
     final currentPaid =
         _amount(_paidCashController.text) + _amount(_paidOnlineController.text);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Bill/Payment Entry'),
+        title: const Text('Edit bill'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
         child: Form(
           key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _payeeController,
-                textCapitalization: TextCapitalization.words,
-                decoration:
-                    const InputDecoration(labelText: 'Payee / vendor *'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter who this bill is for.'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              // Date picker
-              TextFormField(
-                controller: _dateController,
-                decoration: const InputDecoration(labelText: 'Date'),
-                readOnly: true,
-                onTap: () => _selectDate(context),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select a date';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              // Bill Amount (Cash) field
-              TextFormField(
-                controller: _cashAmountController,
-                decoration:
-                    const InputDecoration(labelText: 'Bill Amount (Cash)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => MoneyAmount.validateRupees(
-                  value,
-                  label: 'bill amount (cash)',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 16),
-              // Bill Amount (Online) field
-              TextFormField(
-                controller: _onlineAmountController,
-                decoration:
-                    const InputDecoration(labelText: 'Bill Amount (Online)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => MoneyAmount.validateRupees(
-                  value,
-                  label: 'bill amount (online)',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 16),
-              Text('Amount paid',
-                  style: Theme.of(context).textTheme.titleSmall),
-              TextFormField(
-                controller: _paidCashController,
-                decoration: const InputDecoration(labelText: 'Paid in cash'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => MoneyAmount.validateRupees(
-                  value,
-                  label: 'cash paid',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _paidOnlineController,
-                decoration: const InputDecoration(labelText: 'Paid online'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) => MoneyAmount.validateRupees(
-                  value,
-                  label: 'online amount paid',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.payments_outlined),
-                  title: Text(BillPaymentModel.statusLabel(
-                      BillPaymentModel.statusFor(currentTotal, currentPaid))),
-                  subtitle: Text(
-                    'Outstanding: ₹${MoneyAmount.formatPaise((currentTotal - currentPaid).clamp(0, 0x7fffffffffffffff).toInt())}',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth < 720
+                  ? constraints.maxWidth
+                  : 720.0;
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: width,
+                  height: constraints.maxHeight,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    children: [
+                      EntryFormSection(
+                        title: 'VENDOR DETAILS',
+                        icon: Icons.storefront_outlined,
+                        children: [
+                          TextFormField(
+                            controller: _payeeController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'Payee / vendor *',
+                              prefixIcon: Icon(Icons.store_outlined),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter who this bill is for.'
+                                    : null,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      EntryFormSection(
+                        title: 'BILL DETAILS',
+                        icon: Icons.receipt_long_outlined,
+                        children: [
+                          TextFormField(
+                            controller: _dateController,
+                            readOnly: true,
+                            onTap: () => _selectDate(context),
+                            decoration: const InputDecoration(
+                              labelText: 'Bill date',
+                              prefixIcon: Icon(Icons.calendar_month_outlined),
+                            ),
+                            validator: (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Please select a date.'
+                                    : null,
+                          ),
+                          const SizedBox(height: 12),
+                          EntryMoneyField(
+                            controller: _billTotalController,
+                            label: 'Total bill amount',
+                            validationLabel: 'bill total',
+                            icon: Icons.receipt_outlined,
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _descriptionController,
+                            textCapitalization: TextCapitalization.sentences,
+                            minLines: 2,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              labelText: 'Bill purpose *',
+                              alignLabelWithHint: true,
+                              prefixIcon: Icon(Icons.notes_rounded),
+                            ),
+                            validator: (value) =>
+                                value == null || value.trim().isEmpty
+                                    ? 'Enter what this bill was for.'
+                                    : null,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      EntryFormSection(
+                        title: 'PAYMENT DETAILS',
+                        icon: Icons.payments_outlined,
+                        children: [
+                          _responsivePair(
+                            EntryMoneyField(
+                              controller: _paidCashController,
+                              label: 'Paid in cash',
+                              validationLabel: 'cash paid',
+                              icon: Icons.payments_outlined,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            EntryMoneyField(
+                              controller: _paidOnlineController,
+                              label: 'Paid online / UPI',
+                              validationLabel: 'online amount paid',
+                              icon: Icons.account_balance_outlined,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.payments_outlined),
+                              title: Text(BillPaymentModel.statusLabel(
+                                  BillPaymentModel.statusFor(
+                                      currentTotal, currentPaid))),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            _updateData();
+                          }
+                        },
+                        child: const Text('Save changes'),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _dueDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Due date (required while balance is due)',
-                  suffixIcon: Icon(Icons.calendar_month),
-                ),
-                readOnly: true,
-                onTap: _selectDueDate,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _paidDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Last payment date (optional)',
-                  suffixIcon: Icon(Icons.event_available),
-                ),
-                readOnly: true,
-                onTap: _selectPaidDate,
-              ),
-              const SizedBox(height: 16),
-              CategorySelectField(
-                type: 'expense',
-                value: _expenseCategoryId,
-                currentName: _expenseCategoryName,
-                onChanged: (category) => setState(() {
-                  _expenseCategoryId = category?.id;
-                  _expenseCategoryName = category?.name;
-                }),
-              ),
-              const SizedBox(height: 16),
-              // Description field
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Bill purpose *'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter what this bill was for.'
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    _updateData();
-                  }
-                },
-                child: const Text('Submit'),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

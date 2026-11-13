@@ -9,6 +9,9 @@
 .history
 .svn/
 migrate_working_dir/
+data
+tool
+parlour_account_firestore_export.json
 
 # IntelliJ related
 *.iml

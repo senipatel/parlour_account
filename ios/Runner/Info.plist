@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Parlour Account</string>
+	<string>Parlour Pilot</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Select a photo to use on your parlour account profile.</string>
 	<key>CFBundleExecutable</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>parlour_account</string>
+	<string>Parlour Pilot</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
