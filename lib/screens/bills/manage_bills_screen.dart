@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/services/firebase/account_data.dart';
@@ -6,6 +5,7 @@ import 'package:parlour_account/models/bill_payment_model.dart';
 import 'package:parlour_account/screens/bills/edit_bill_screen.dart';
 import 'package:parlour_account/utils/month_period.dart';
 import 'package:parlour_account/utils/money_amount.dart';
+import 'package:parlour_account/utils/widgets/firestore_paged_list.dart';
 
 class ManageBillEntryPage extends StatefulWidget {
   const ManageBillEntryPage({super.key});
@@ -17,6 +17,7 @@ class ManageBillEntryPage extends StatefulWidget {
 class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
   List<MonthPeriod> _availablePeriods = [];
   String? _selectedPeriodKey;
+  int _listRevision = 0;
 
   MonthPeriod? get _selectedPeriod {
     for (final period in _availablePeriods) {
@@ -88,6 +89,7 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
   Future<void> _deleteData(String docId) async {
     try {
       await AccountData.collection('BillPaymentEntry').doc(docId).delete();
+      if (mounted) setState(() => _listRevision++);
 
     } catch (e) {
       print("Error deleting data: $e");
@@ -148,56 +150,36 @@ class _ManageBillEntryPageState extends State<ManageBillEntryPage> {
             ),
             const SizedBox(height: 20),
 
-            // StreamBuilder to display data
+            // One-time, paginated read; this list does not need live updates.
             Expanded(
               child: selectedPeriod != null
-                  ? StreamBuilder<QuerySnapshot>(
-                      stream: AccountData.collection('BillPaymentEntry')
+                  ? FirestorePagedList(
+                      key: ValueKey('bills:${selectedPeriod.key}:$_listRevision'),
+                      queryKey: selectedPeriod.key,
+                      query: AccountData.collection('BillPaymentEntry')
                           .where('date',
                               isGreaterThanOrEqualTo: selectedPeriod.startDate)
                           .where('date',
-                              isLessThan: selectedPeriod.endDateExclusive)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-                        if (snapshot.hasError) {
-                          return const Center(
-                              child: Text('Error loading data'));
-                        }
-
-                        final documents = snapshot.data!.docs;
-
-                        if (documents.isEmpty) {
-                          return const Center(child: Text('No data found'));
-                        }
-
-                        return ListView.separated(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          itemCount: documents.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final entry = documents[index];
-                            final data = entry.data() as Map<String, dynamic>;
-                            return _BillRecordCard(
-                              data: data,
-                              onEdit: () => Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditBillPage(
-                                    docId: entry.id,
-                                    entryData: data,
-                                  ),
+                              isLessThan: selectedPeriod.endDateExclusive),
+                      emptyMessage: 'No data found',
+                      itemBuilder: (context, entry) {
+                        final data = entry.data();
+                        return _BillRecordCard(
+                          data: data,
+                          onEdit: () async {
+                            await Navigator.push<void>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditBillPage(
+                                  docId: entry.id,
+                                  entryData: data,
                                 ),
                               ),
-                              onDelete: () =>
-                                  _showDeleteConfirmationDialog(entry.id, data),
                             );
+                            if (mounted) setState(() => _listRevision++);
                           },
+                          onDelete: () =>
+                              _showDeleteConfirmationDialog(entry.id, data),
                         );
                       },
                     )

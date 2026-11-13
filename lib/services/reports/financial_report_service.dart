@@ -26,36 +26,29 @@ class FinancialReportService {
         .orderBy('paidDate', descending: true)
         .limit(_pageSize + 1)
         .get();
-    final legacyPaymentQuery = AccountData.collection('BillPaymentEntry')
-        .where('date', isGreaterThanOrEqualTo: startDate)
-        .where('date', isLessThanOrEqualTo: endDate)
-        .limit(_pageSize + 1)
-        .get();
-
     final results = await Future.wait([
       dailyQuery,
       invoiceQuery,
       paymentsQuery,
-      legacyPaymentQuery,
     ]);
     final dailySnapshot = results[0];
     final invoiceSnapshot = results[1];
     final paymentsSnapshot = results[2];
-    final legacySnapshot = results[3];
-
     final paymentDocuments = <String, Map<String, dynamic>>{
       for (final doc in paymentsSnapshot.docs.take(_pageSize))
         doc.id: doc.data(),
     };
-    for (final doc in legacySnapshot.docs.take(_pageSize)) {
+    // Legacy bills had no paidDate, so their payment date is their invoice
+    // date. The invoice query already fetched these same documents; reuse them
+    // instead of issuing a second overlapping read.
+    for (final doc in invoiceSnapshot.docs.take(_pageSize)) {
       final data = doc.data();
       if (data['paidDate'] == null) paymentDocuments[doc.id] = data;
     }
 
     final limited = dailySnapshot.docs.length > _pageSize ||
         invoiceSnapshot.docs.length > _pageSize ||
-        paymentsSnapshot.docs.length > _pageSize ||
-        legacySnapshot.docs.length > _pageSize;
+        paymentsSnapshot.docs.length > _pageSize;
 
     return FinancialReport.compute(
       startDate: startDate,

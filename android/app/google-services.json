@@ -41,6 +41,42 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597433345372:android:b3a8fb1f2a0438a5fc0d99",
+        "android_client_info": {
+          "package_name": "com.parlourpilot.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "597433345372-d1vq6ps5qjhinikk81g7lpg9lb7piiml.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA00-_pV1ShJHhzKt4HcWzNBxJIye_uAGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "597433345372-d1vq6ps5qjhinikk81g7lpg9lb7piiml.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "597433345372-p5chgrbcqfun6fdd1egcur35ou3lh663.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.parlourAccount"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

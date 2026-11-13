@@ -1,10 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:parlour_account/app/theme/app_theme.dart';
 import 'package:parlour_account/services/firebase/account_data.dart';
 import 'package:parlour_account/screens/daily_entry/edit_data_screen.dart';
 import 'package:parlour_account/utils/month_period.dart';
 import 'package:parlour_account/utils/money_amount.dart';
+import 'package:parlour_account/utils/widgets/firestore_paged_list.dart';
 
 class EditDailyDataEntryPage extends StatefulWidget {
   const EditDailyDataEntryPage({super.key});
@@ -16,6 +16,7 @@ class EditDailyDataEntryPage extends StatefulWidget {
 class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
   List<MonthPeriod> _availablePeriods = [];
   String? _selectedPeriodKey;
+  int _listRevision = 0;
 
   MonthPeriod? get _selectedPeriod {
     for (final period in _availablePeriods) {
@@ -101,6 +102,7 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
   Future<void> _deleteData(String docId) async {
     try {
       await AccountData.collection('DailyDataEntry').doc(docId).delete();
+      if (mounted) setState(() => _listRevision++);
 
     } catch (e) {
       print("Error deleting data: $e");
@@ -169,58 +171,36 @@ class EditDailyDataEntryPageState extends State<EditDailyDataEntryPage> {
             ),
             const SizedBox(height: 8),
 
-            // Real-time data stream (conditionally rendered)
+            // One-time, paginated read; this list does not need live updates.
             Expanded(
               child: selectedPeriod != null
-                  ? StreamBuilder<QuerySnapshot>(
-                      stream: AccountData.collection('DailyDataEntry')
+                  ? FirestorePagedList(
+                      key: ValueKey('daily:${selectedPeriod.key}:$_listRevision'),
+                      queryKey: selectedPeriod.key,
+                      query: AccountData.collection('DailyDataEntry')
                           .where('date',
                               isGreaterThanOrEqualTo: selectedPeriod.startDate)
                           .where('date',
-                              isLessThan: selectedPeriod.endDateExclusive)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        }
-                        if (snapshot.hasError) {
-                          return const Center(
-                              child: Text('Error loading data'));
-                        }
-
-                        final documents = snapshot.data!.docs;
-
-                        if (documents.isEmpty) {
-                          return const Center(
-                              child: Text(
-                                  'No data found for this month and year'));
-                        }
-
-                        return ListView.separated(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          itemCount: documents.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final entry = documents[index];
-                            final data = entry.data() as Map<String, dynamic>;
-                            return _DailyEntryRecordCard(
-                              data: data,
-                              onEdit: () => Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditDailyDataPage(
-                                    entryData: data,
-                                    docId: entry.id,
-                                  ),
+                              isLessThan: selectedPeriod.endDateExclusive),
+                      emptyMessage: 'No data found for this month and year',
+                      itemBuilder: (context, entry) {
+                        final data = entry.data();
+                        return _DailyEntryRecordCard(
+                          data: data,
+                          onEdit: () async {
+                            await Navigator.push<void>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditDailyDataPage(
+                                  entryData: data,
+                                  docId: entry.id,
                                 ),
                               ),
-                              onDelete: () =>
-                                  _showDeleteConfirmationDialog(entry.id, data),
                             );
+                            if (mounted) setState(() => _listRevision++);
                           },
+                          onDelete: () =>
+                              _showDeleteConfirmationDialog(entry.id, data),
                         );
                       },
                     )
