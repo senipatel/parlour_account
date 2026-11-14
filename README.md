@@ -86,6 +86,8 @@ Android release builds must use a production keystore. The release signing confi
 
 Provide these through a protected local or CI secret store. Do not commit keystores, passwords, or signing properties. A release built without these values will not use the debug signing key and is not ready for distribution.
 
+For local Android release builds, `android/app/build.gradle` also reads `android/key.properties` when the `PARLOUR_RELEASE_*` environment variables are unset. Keep the referenced keystore and this properties file private and backed up securely; losing the upload key can prevent future app updates. The local signing files are excluded by `.gitignore`.
+
 ## Work log
 
 Implementation decisions, verification results, and external setup gates are tracked in `IMPLEMENTATION_PLAN.md` and `WORK_LOG.md`.
